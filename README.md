@@ -41,7 +41,7 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-前端地址为 `http://localhost:5173`。开发服务器会把 `/api` 转发到 FastAPI。
+前端地址为 `http://localhost:7777`。开发服务器会把 `/api` 转发到 FastAPI。
 
 ## 验证
 
