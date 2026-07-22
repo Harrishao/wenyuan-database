@@ -79,3 +79,83 @@ export interface SearchResponse {
   embedding_model: string;
   results: SearchResult[];
 }
+
+export type ReportStatus = "draft" | "generating" | "ready" | "failed" | "archived";
+
+export interface ReportTemplateSection {
+  key: string;
+  title: string;
+  position: number;
+  instructions: string;
+  required_inputs: string[];
+}
+
+export interface ReportTemplate {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  version_id: string;
+  version: number;
+  required_inputs: string[];
+  sections: ReportTemplateSection[];
+}
+
+export interface ReportCitation {
+  id: string;
+  marker: string;
+  document_name: string;
+  content: string;
+  heading: string | null;
+  page_number: number | null;
+}
+
+export interface ReportSection {
+  id: string;
+  key: string;
+  title: string;
+  position: number;
+  content_markdown: string;
+  status: ProcessingStatus;
+  citations: ReportCitation[];
+}
+
+export interface ReportListItem {
+  id: string;
+  title: string;
+  status: ReportStatus;
+  template_name: string;
+  knowledge_base_name: string;
+  current_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReportDetail extends ReportListItem {
+  inputs: Record<string, string>;
+  progress: number;
+  sections: ReportSection[];
+}
+
+export interface ReportCreateResponse {
+  report: ReportDetail;
+  job_id: string;
+}
+
+export interface ReportVersion {
+  id: string;
+  version: number;
+  reason: string;
+  content_markdown: string;
+  created_at: string;
+}
+
+export interface ReportEvent {
+  report_id: string;
+  report_status: ReportStatus;
+  job_status: ProcessingStatus | null;
+  progress: number;
+  current_section: string | null;
+  completed_sections: string[];
+  error_message: string | null;
+}

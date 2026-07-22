@@ -4,6 +4,12 @@ import type {
   DocumentRecord,
   HealthResponse,
   KnowledgeBase,
+  ReportCreateResponse,
+  ReportDetail,
+  ReportEvent,
+  ReportListItem,
+  ReportTemplate,
+  ReportVersion,
   SearchResponse,
   UploadResponse,
   User,
@@ -136,4 +142,85 @@ export const api = {
       query,
       top_k: topK,
     }),
+  listReportTemplates: () => request<ReportTemplate[]>("/api/v1/report-templates"),
+  listReports: (query = "") =>
+    request<ReportListItem[]>(
+      `/api/v1/reports${query ? `?query=${encodeURIComponent(query)}` : ""}`,
+    ),
+  createReport: (payload: {
+    knowledge_base_id: string;
+    template_key: string;
+    title: string;
+    inputs: Record<string, string>;
+  }) => jsonRequest<ReportCreateResponse>("/api/v1/reports", "POST", payload),
+  getReport: (id: string) => request<ReportDetail>(`/api/v1/reports/${id}`),
+  updateReportSection: (reportId: string, sectionKey: string, content_markdown: string) =>
+    jsonRequest<ReportDetail>(`/api/v1/reports/${reportId}/sections/${sectionKey}`, "PATCH", {
+      content_markdown,
+    }),
+  retryReportSection: (reportId: string, sectionKey: string) =>
+    jsonRequest<ReportCreateResponse>(
+      `/api/v1/reports/${reportId}/sections/${sectionKey}/retry`,
+      "POST",
+      { reason: "generation_retry" },
+    ),
+  listReportVersions: (reportId: string) =>
+    request<ReportVersion[]>(`/api/v1/reports/${reportId}/versions`),
+  restoreReportVersion: (reportId: string, version: number) =>
+    request<ReportDetail>(`/api/v1/reports/${reportId}/versions/${version}/restore`, {
+      method: "POST",
+    }),
+  exportReport: async (reportId: string, title: string) => {
+    const response = await authorizedFetch(`/api/v1/reports/${reportId}/export.docx`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${title}.docx`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  },
 };
+
+async function authorizedFetch(path: string, init?: RequestInit, allowRefresh = true) {
+  const response = await fetch(path, {
+    ...init,
+    credentials: "include",
+    headers: {
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      ...init?.headers,
+    },
+  });
+  if (response.status === 401 && allowRefresh) {
+    await refreshAccessToken();
+    return authorizedFetch(path, init, false);
+  }
+  if (!response.ok) throw new ApiClientError(response.status, await parseError(response));
+  return response;
+}
+
+export async function streamReportEvents(
+  reportId: string,
+  onEvent: (event: ReportEvent) => void,
+  signal: AbortSignal,
+) {
+  const response = await authorizedFetch(`/api/v1/reports/${reportId}/events`, { signal });
+  if (!response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (!signal.aborted) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split("\n\n");
+    buffer = frames.pop() ?? "";
+    for (const frame of frames) {
+      const data = frame
+        .split("\n")
+        .find((line) => line.startsWith("data: "))
+        ?.slice(6);
+      if (data && data !== "{}") onEvent(JSON.parse(data) as ReportEvent);
+    }
+  }
+}

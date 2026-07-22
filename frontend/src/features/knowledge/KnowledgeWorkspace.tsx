@@ -83,7 +83,7 @@ function DocumentRow({
   );
 }
 
-export function KnowledgeWorkspace() {
+export function KnowledgeWorkspace({ onOpenReports }: { onOpenReports: () => void }) {
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -215,6 +215,9 @@ export function KnowledgeWorkspace() {
             </div>
           </div>
           <div className="flex items-center gap-4 text-sm">
+            <button className="quiet-action" onClick={onOpenReports} type="button">
+              <FileText className="h-4 w-4" />报告装配台
+            </button>
             <span className="hidden text-slate-500 sm:inline">{user?.display_name}</span>
             <button className="quiet-action" onClick={() => void logout()} type="button">
               <LogOut className="h-4 w-4" />退出

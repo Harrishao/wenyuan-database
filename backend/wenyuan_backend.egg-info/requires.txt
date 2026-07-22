@@ -1,6 +1,7 @@
 alembic<2,>=1.14
 asyncpg<1,>=0.30
 fastapi<1,>=0.115
+httpx<1,>=0.28
 pgvector<1,>=0.3
 psycopg[binary]<4,>=3.2
 pydantic[email]<3,>=2.9
@@ -9,6 +10,7 @@ pypdf<7,>=6
 pwdlib[argon2]<1,>=0.3
 pyjwt<3,>=2.10
 python-multipart<1,>=0.0.20
+python-docx<2,>=1.1
 sqlalchemy<2.1,>=2.0
 uvicorn[standard]<1,>=0.34
 
