@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,8 +21,15 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
 
     database_url: str = "postgresql+asyncpg://wenyuan:wenyuan@localhost:5432/wenyuan"
-    cors_origins: str = "http://localhost:5173"
+    cors_origins: str = "http://localhost:7777"
     storage_root: Path = Path("./data/uploads")
+    max_upload_bytes: int = Field(default=20 * 1024 * 1024, gt=0)
+    chunk_target_chars: int = Field(default=650, ge=100, le=4000)
+    chunk_overlap_chars: int = Field(default=100, ge=0, le=1000)
+
+    jwt_secret: SecretStr = SecretStr("change-this-development-secret-before-production")
+    access_token_minutes: int = Field(default=30, gt=0)
+    refresh_token_days: int = Field(default=7, gt=0)
 
     llm_base_url: str | None = None
     llm_api_key: SecretStr | None = None
@@ -36,6 +43,18 @@ class Settings(BaseSettings):
         if not value.startswith("/"):
             raise ValueError("API_PREFIX 必须以 / 开头")
         return value.rstrip("/")
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.chunk_overlap_chars >= self.chunk_target_chars:
+            raise ValueError("CHUNK_OVERLAP_CHARS 必须小于 CHUNK_TARGET_CHARS")
+        if (
+            self.app_env == "production"
+            and self.jwt_secret.get_secret_value()
+            == "change-this-development-secret-before-production"
+        ):
+            raise ValueError("生产环境必须配置独立 JWT_SECRET")
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:

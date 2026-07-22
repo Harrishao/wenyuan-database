@@ -99,6 +99,7 @@ class Document(UuidPrimaryKeyMixin, TimestampMixin, Base):
     original_filename: Mapped[str] = mapped_column(String(255))
     storage_key: Mapped[str] = mapped_column(String(500), unique=True)
     mime_type: Mapped[str] = mapped_column(String(120))
+    file_size: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
     status: Mapped[ProcessingStatus] = mapped_column(
         Enum(

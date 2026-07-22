@@ -13,7 +13,11 @@ dependencies = [
   "fastapi>=0.115,<1",
   "pgvector>=0.3,<1",
   "psycopg[binary]>=3.2,<4",
+  "pydantic[email]>=2.9,<3",
   "pydantic-settings>=2.7,<3",
+  "pypdf>=6,<7",
+  "pwdlib[argon2]>=0.3,<1",
+  "pyjwt>=2.10,<3",
   "python-multipart>=0.0.20,<1",
   "sqlalchemy>=2.0,<2.1",
   "uvicorn[standard]>=0.34,<1",
@@ -26,6 +30,7 @@ dev = [
   "pytest-asyncio>=0.25,<1",
   "ruff>=0.9,<1",
 ]
+ml = ["sentence-transformers>=5,<6"]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

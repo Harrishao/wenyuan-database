@@ -1,10 +1,10 @@
 import { createBrowserRouter } from "react-router-dom";
 
-import { FoundationPage } from "@/features/foundation/FoundationPage";
+import { AuthGate } from "@/features/auth/AuthGate";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <FoundationPage />,
+    element: <AuthGate />,
   },
 ]);

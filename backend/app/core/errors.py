@@ -1,6 +1,7 @@
 from typing import Any
 
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -42,3 +43,15 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
         )
     )
     return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+
+
+async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    payload = ErrorEnvelope(
+        error=ErrorBody(
+            code="VALIDATION_ERROR",
+            message="请求内容不符合接口要求",
+            details={"issues": exc.errors()},
+            request_id=getattr(request.state, "request_id", None),
+        )
+    )
+    return JSONResponse(status_code=422, content=payload.model_dump(mode="json"))

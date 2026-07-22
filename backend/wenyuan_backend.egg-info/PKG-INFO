@@ -8,7 +8,11 @@ Requires-Dist: asyncpg<1,>=0.30
 Requires-Dist: fastapi<1,>=0.115
 Requires-Dist: pgvector<1,>=0.3
 Requires-Dist: psycopg[binary]<4,>=3.2
+Requires-Dist: pydantic[email]<3,>=2.9
 Requires-Dist: pydantic-settings<3,>=2.7
+Requires-Dist: pypdf<7,>=6
+Requires-Dist: pwdlib[argon2]<1,>=0.3
+Requires-Dist: pyjwt<3,>=2.10
 Requires-Dist: python-multipart<1,>=0.0.20
 Requires-Dist: sqlalchemy<2.1,>=2.0
 Requires-Dist: uvicorn[standard]<1,>=0.34
@@ -17,3 +21,5 @@ Requires-Dist: httpx<1,>=0.28; extra == "dev"
 Requires-Dist: pytest<9,>=8.3; extra == "dev"
 Requires-Dist: pytest-asyncio<1,>=0.25; extra == "dev"
 Requires-Dist: ruff<1,>=0.9; extra == "dev"
+Provides-Extra: ml
+Requires-Dist: sentence-transformers<6,>=5; extra == "ml"

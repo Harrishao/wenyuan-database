@@ -21,3 +21,217 @@ body {
 .font-serif {
   font-family: "Noto Serif SC", "Songti SC", SimSun, serif;
 }
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #0891a2;
+  outline-offset: 2px;
+}
+
+.archive-grid {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 8%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 8%) 1px, transparent 1px);
+  background-size: 42px 42px;
+  transform: rotate(-8deg) scale(1.18);
+}
+
+.field-label,
+.section-label {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: #56707a;
+  text-transform: uppercase;
+}
+
+.field-input,
+.compact-input,
+.search-box {
+  width: 100%;
+  border: 1px solid #bdcdd2;
+  border-radius: 0;
+  background: #fff;
+  color: #183541;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.field-input {
+  margin-top: 0.5rem;
+  padding: 0.8rem 0.9rem;
+}
+
+.compact-input {
+  padding: 0.55rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.search-box {
+  min-height: 7.5rem;
+  resize: vertical;
+  padding: 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.field-input:focus,
+.compact-input:focus,
+.search-box:focus {
+  border-color: #0891a2;
+  box-shadow: inset 3px 0 0 #0891a2;
+  outline: none;
+}
+
+.primary-action,
+.quiet-action,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: background 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.primary-action {
+  min-height: 2.65rem;
+  background: #173b49;
+  padding: 0.65rem 1rem;
+  color: white;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.primary-action:hover:not(:disabled) {
+  background: #0d6672;
+}
+
+.primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.quiet-action {
+  padding: 0.45rem 0.65rem;
+  color: #526a73;
+}
+
+.quiet-action:hover,
+.icon-button:hover {
+  background: #e2ecee;
+  color: #0d6672;
+}
+
+.icon-button {
+  height: 2rem;
+  width: 2rem;
+  color: #657b83;
+}
+
+.icon-button.danger:hover {
+  background: #fff0ef;
+  color: #b42318;
+}
+
+.library-spine {
+  position: relative;
+  width: 100%;
+  border-left: 3px solid #aabcc1;
+  padding: 0.8rem 2rem 0.8rem 0.85rem;
+  text-align: left;
+  color: #49616b;
+}
+
+.library-spine:hover,
+.library-spine.active {
+  background: #e4eef0;
+  color: #173b49;
+}
+
+.library-spine.active {
+  border-left-color: #0891a2;
+}
+
+.document-spine {
+  display: flex;
+  gap: 1rem;
+  border: 1px solid #d3dfe2;
+  border-left-width: 5px;
+  background: rgb(255 255 255 / 76%);
+  padding: 1rem;
+}
+
+.document-spine.status-pending { border-left-color: #94a3b8; }
+.document-spine.status-running { border-left-color: #0891a2; }
+.document-spine.status-succeeded { border-left-color: #27856f; }
+.document-spine.status-failed { border-left-color: #c4473d; }
+.document-spine.status-cancelled { border-left-color: #7c8790; }
+
+.status-label {
+  border: 1px solid #c6d6da;
+  padding: 0.1rem 0.4rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.62rem;
+  color: #607780;
+}
+
+.upload-field,
+.empty-invitation {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  border: 1px dashed #aabfc5;
+  color: #526a73;
+}
+
+.upload-field {
+  min-height: 13rem;
+  flex-direction: column;
+}
+
+.empty-invitation {
+  min-height: 5rem;
+  font-size: 0.82rem;
+}
+
+.upload-field:hover,
+.empty-invitation:hover {
+  border-color: #0891a2;
+  background: #eff8f8;
+  color: #0d6672;
+}
+
+.evidence-slip {
+  border: 1px solid #cad9dd;
+  background: #fff;
+  padding: 1rem;
+  box-shadow: 4px 4px 0 #dce7e9;
+}
+
+.empty-copy {
+  border: 1px dashed #bdcdd2;
+  padding: 1.5rem;
+  text-align: center;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #71858c;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

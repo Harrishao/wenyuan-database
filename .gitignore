@@ -16,5 +16,6 @@ backend/data/
 .vscode/
 *.log
 
+素材/
 *.md
 !README.md
