@@ -20,6 +20,7 @@ from app.schemas.knowledge import (
     JobResponse,
     KnowledgeBaseCreate,
     KnowledgeBaseResponse,
+    KnowledgeBaseUpdate,
     SearchRequest,
     SearchResponse,
     SearchResult,
@@ -93,6 +94,43 @@ async def create_knowledge_base(
         name=knowledge_base.name,
         description=knowledge_base.description,
         document_count=0,
+        created_at=knowledge_base.created_at,
+        updated_at=knowledge_base.updated_at,
+    )
+
+
+@router.patch("/{knowledge_base_id}", response_model=KnowledgeBaseResponse)
+async def update_knowledge_base(
+    knowledge_base_id: UUID,
+    payload: KnowledgeBaseUpdate,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> KnowledgeBaseResponse:
+    knowledge_base = await get_owned_knowledge_base(session, knowledge_base_id, current_user.id)
+    if payload.name is not None:
+        name = payload.name.strip()
+        if not name:
+            raise AppError("KNOWLEDGE_BASE_NAME_EMPTY", "知识库名称不能为空", status_code=422)
+        knowledge_base.name = name
+    if payload.description is not None:
+        description = payload.description.strip()
+        knowledge_base.description = description if description else None
+
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise AppError("KNOWLEDGE_BASE_NAME_EXISTS", "同名知识库已存在", status_code=409) from exc
+    await session.refresh(knowledge_base)
+
+    doc_count = await session.scalar(
+        select(func.count(Document.id)).where(Document.knowledge_base_id == knowledge_base.id)
+    )
+    return KnowledgeBaseResponse(
+        id=knowledge_base.id,
+        name=knowledge_base.name,
+        description=knowledge_base.description,
+        document_count=doc_count or 0,
         created_at=knowledge_base.created_at,
         updated_at=knowledge_base.updated_at,
     )

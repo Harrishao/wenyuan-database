@@ -11,6 +11,11 @@ class KnowledgeBaseCreate(BaseModel):
     description: str | None = Field(default=None, max_length=2000)
 
 
+class KnowledgeBaseUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+
+
 class KnowledgeBaseResponse(BaseModel):
     id: UUID
     name: str

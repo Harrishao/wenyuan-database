@@ -107,6 +107,8 @@ export const api = {
   listKnowledgeBases: () => request<KnowledgeBase[]>("/api/v1/knowledge-bases"),
   createKnowledgeBase: (payload: { name: string; description?: string }) =>
     jsonRequest<KnowledgeBase>("/api/v1/knowledge-bases", "POST", payload),
+  updateKnowledgeBase: (id: string, payload: { name?: string; description?: string }) =>
+    jsonRequest<KnowledgeBase>(`/api/v1/knowledge-bases/${id}`, "PATCH", payload),
   deleteKnowledgeBase: (id: string) =>
     request<void>(`/api/v1/knowledge-bases/${id}`, { method: "DELETE" }),
   listDocuments: (knowledgeBaseId: string, query = "") =>

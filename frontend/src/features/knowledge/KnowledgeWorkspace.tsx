@@ -6,11 +6,13 @@ import {
   FileSearch,
   FileText,
   LogOut,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 
 import type { DocumentRecord, ProcessingStatus, SearchResponse } from "@/contracts/api";
@@ -88,6 +90,9 @@ export function KnowledgeWorkspace() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
   const [filter, setFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResult, setSearchResult] = useState<SearchResponse | null>(null);
@@ -125,6 +130,16 @@ export function KnowledgeWorkspace() {
     },
     onError: (error) => setNotice(errorText(error)),
   });
+  const updateKnowledgeBase = useMutation({
+    mutationFn: (payload: { name: string; description?: string }) =>
+      api.updateKnowledgeBase(selected!.id, payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+      setIsEditing(false);
+      setNotice("知识库信息已保存");
+    },
+    onError: (error) => setNotice(errorText(error)),
+  });
   const uploadDocument = useMutation({
     mutationFn: (file: File) => api.uploadDocument(selected!.id, file),
     onSuccess: async () => {
@@ -158,14 +173,32 @@ export function KnowledgeWorkspace() {
     createKnowledgeBase.mutate({ name, description });
   }
 
+  function startEditing() {
+    if (!selected) return;
+    setEditName(selected.name);
+    setEditDescription(selected.description || "");
+    setIsEditing(true);
+  }
+
+  function submitUpdateKnowledgeBase(event: FormEvent) {
+    event.preventDefault();
+    if (!selected || !editName.trim()) return;
+    updateKnowledgeBase.mutate({
+      name: editName.trim(),
+      description: editDescription.trim(),
+    });
+  }
+
   function submitSearch(event: FormEvent) {
     event.preventDefault();
     if (searchQuery.trim() && selected) search.mutate(searchQuery.trim());
   }
 
   function acceptFiles(files: FileList | null) {
-    const file = files?.[0];
-    if (file && selected) uploadDocument.mutate(file);
+    if (!files || !selected) return;
+    Array.from(files).forEach((file) => {
+      uploadDocument.mutate(file);
+    });
   }
 
   return (
@@ -200,14 +233,14 @@ export function KnowledgeWorkspace() {
           <aside className="border-b border-[#c8d6da] bg-[#f1f6f7] p-5 xl:border-b-0 xl:border-r">
             <div className="flex items-center justify-between">
               <p className="section-label">知识库书架</p>
-              <button className="icon-button" onClick={() => setCreating(!creating)} title="新建知识库" type="button">
-                <Plus className="h-4 w-4" />
+              <button className="icon-button" onClick={() => setCreating(!creating)} title={creating ? "取消创建" : "新建知识库"} type="button">
+                {creating ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               </button>
             </div>
             {creating && (
               <form className="mt-4 space-y-3 border-l-2 border-cyan-600 pl-3" onSubmit={submitKnowledgeBase}>
                 <input className="compact-input" value={name} onChange={(event) => setName(event.target.value)} required placeholder="知识库名称" />
-                <textarea className="compact-input min-h-20 resize-none" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="收录范围，可选" />
+                <textarea className="compact-input min-h-20 resize-none" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="对知识库的描述" />
                 <button className="primary-action w-full" disabled={createKnowledgeBase.isPending} type="submit">保存知识库</button>
               </form>
             )}
@@ -238,17 +271,52 @@ export function KnowledgeWorkspace() {
 
           <section className="border-b border-[#c8d6da] p-5 lg:p-7 xl:border-b-0 xl:border-r">
             <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
+              <div className="flex-1 min-w-[280px]">
                 <p className="section-label">文献归档流水</p>
-                <h1 className="mt-2 font-serif text-3xl font-semibold">{selected?.name ?? "尚未建立知识库"}</h1>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">{selected?.description || "上传资料后，系统会保留来源位置并建立可检索片段。"}</p>
+                {isEditing && selected ? (
+                  <form className="mt-2 space-y-3 max-w-xl border-l-2 border-cyan-600 pl-3" onSubmit={submitUpdateKnowledgeBase}>
+                    <input
+                      className="compact-input font-serif text-lg font-semibold"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      required
+                      placeholder="知识库名称"
+                    />
+                    <textarea
+                      className="compact-input min-h-16 resize-none text-sm"
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      placeholder="对知识库的描述"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button className="primary-action text-xs py-1 px-3" disabled={updateKnowledgeBase.isPending} type="submit">
+                        {updateKnowledgeBase.isPending ? "保存中..." : "保存"}
+                      </button>
+                      <button className="quiet-action text-xs py-1 px-3" onClick={() => setIsEditing(false)} type="button">
+                        取消
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="mt-2 flex items-center gap-2">
+                      <h1 className="font-serif text-3xl font-semibold">{selected?.name ?? "尚未建立知识库"}</h1>
+                      {selected && (
+                        <button className="icon-button" onClick={startEditing} title="编辑知识库名称与描述" type="button">
+                          <Pencil className="h-4 w-4 text-slate-500 hover:text-cyan-700" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">{selected?.description || "上传资料后，系统会保留来源位置并建立可检索片段。"}</p>
+                  </>
+                )}
               </div>
               {selected && (
                 <button className="primary-action" onClick={() => fileInput.current?.click()} disabled={uploadDocument.isPending} type="button">
                   <Upload className="h-4 w-4" />{uploadDocument.isPending ? "正在上传" : "上传文献"}
                 </button>
               )}
-              <input ref={fileInput} className="hidden" type="file" accept=".pdf,.md,.txt" onChange={(event) => acceptFiles(event.target.files)} />
+              <input ref={fileInput} className="hidden" type="file" multiple accept=".pdf,.md,.txt" onChange={(event) => acceptFiles(event.target.files)} />
             </div>
 
             {selected && (
