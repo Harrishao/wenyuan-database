@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     jwt_secret: SecretStr = SecretStr("change-this-development-secret-before-production")
     access_token_minutes: int = Field(default=30, gt=0)
     refresh_token_days: int = Field(default=7, gt=0)
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65_535)
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_from: str | None = None
+    smtp_use_tls: bool = True
 
     llm_base_url: str | None = None
     llm_api_key: SecretStr | None = None

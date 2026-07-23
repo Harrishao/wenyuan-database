@@ -9,6 +9,7 @@ import {
   FileText,
   LogOut,
   Pencil,
+  Settings,
   Plus,
   RefreshCw,
   Search,
@@ -45,11 +46,13 @@ function DocumentRow({
   index,
   onDelete,
   onRetry,
+  onEditMetadata,
 }: {
   document: DocumentRecord;
   index: number;
   onDelete: () => void;
   onRetry: () => void;
+  onEditMetadata: () => void;
 }) {
   return (
     <article className={`document-spine status-${document.status}`}>
@@ -70,9 +73,17 @@ function DocumentRow({
           {document.keywords.slice(0, 4).map((keyword) => (
             <span key={keyword}>#{keyword}</span>
           ))}
+          {document.tags.map((tag) => <span key={tag}>标签：{tag}</span>)}
+          {document.category && <span>分类：{document.category}</span>}
+          {document.moderation_status !== "approved" && (
+            <span>审核：{document.moderation_status}</span>
+          )}
         </div>
       </div>
       <div className="flex items-start gap-1">
+        <button className="icon-button" onClick={onEditMetadata} title="参考文献元数据、标签与归档" type="button">
+          <Pencil className="h-4 w-4" />
+        </button>
         {document.status === "failed" && (
           <button className="icon-button" onClick={onRetry} title="重新处理" type="button">
             <RefreshCw className="h-4 w-4" />
@@ -89,9 +100,11 @@ function DocumentRow({
 export function KnowledgeWorkspace({
   onOpenReports,
   onOpenAdmin,
+  onOpenProfile,
 }: {
   onOpenReports: () => void;
   onOpenAdmin: () => void;
+  onOpenProfile: () => void;
 }) {
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -172,6 +185,61 @@ export function KnowledgeWorkspace({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents", selected?.id] }),
     onError: (error) => setNotice(errorText(error)),
   });
+  const updateMetadata = useMutation({
+    mutationFn: ({
+      document,
+      payload,
+    }: {
+      document: DocumentRecord;
+      payload: Parameters<typeof api.updateDocumentMetadata>[1];
+    }) => api.updateDocumentMetadata(document.id, payload),
+    onSuccess: async () => {
+      setNotice("文献元数据、标签与归档信息已更新");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["documents"] }),
+        queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] }),
+      ]);
+    },
+    onError: (error) => setNotice(errorText(error)),
+  });
+
+  function editDocumentMetadata(document: DocumentRecord) {
+    const author = window.prompt("作者", document.author ?? "") ?? document.author ?? "";
+    const title = window.prompt(
+      "参考文献标题",
+      document.publication_title ?? document.original_filename,
+    );
+    if (title === null) return;
+    const yearText = window.prompt(
+      "出版年份",
+      document.publication_year ? String(document.publication_year) : "",
+    );
+    if (yearText === null) return;
+    const source = window.prompt("来源/期刊/出版社", document.source ?? "");
+    if (source === null) return;
+    const category = window.prompt("分类", document.category ?? "");
+    if (category === null) return;
+    const tags = window.prompt("标签，使用逗号分隔", document.tags.join(","));
+    if (tags === null) return;
+    const targetName = window.prompt(
+      `归档到知识库（输入名称）：${knowledgeBases.data?.map((item) => item.name).join("、")}`,
+      selected?.name ?? "",
+    );
+    if (targetName === null) return;
+    const target = knowledgeBases.data?.find((item) => item.name === targetName.trim());
+    updateMetadata.mutate({
+      document,
+      payload: {
+        author,
+        publication_title: title,
+        publication_year: yearText ? Number(yearText) : undefined,
+        source,
+        category,
+        tags: tags.split(",").map((item) => item.trim()).filter(Boolean),
+        knowledge_base_id: target?.id,
+      },
+    });
+  }
   const search = useMutation({
     mutationFn: (query: string) => api.searchKnowledgeBase(selected!.id, query),
     onSuccess: setSearchResult,
@@ -234,6 +302,9 @@ export function KnowledgeWorkspace({
               </button>
             )}
             <span className="hidden text-slate-500 sm:inline">{user?.display_name}</span>
+            <button className="quiet-action" onClick={onOpenProfile} type="button">
+              <Settings className="h-4 w-4" />个人中心
+            </button>
             <button className="quiet-action" onClick={() => void logout()} type="button">
               <LogOut className="h-4 w-4" />退出
             </button>
@@ -241,7 +312,7 @@ export function KnowledgeWorkspace({
         </header>
 
         {notice && (
-          <div className="flex items-center justify-between border-b border-cyan-200 bg-cyan-50 px-5 py-2 text-sm text-cyan-900">
+          <div className="app-toast flex items-center justify-between border-b border-cyan-200 bg-cyan-50 px-5 py-2 text-sm text-cyan-900">
             <span>{notice}</span>
             <button onClick={() => setNotice(null)} type="button">关闭</button>
           </div>
@@ -362,6 +433,7 @@ export function KnowledgeWorkspace({
                     key={document.id}
                     onDelete={() => deleteDocument.mutate(document.id)}
                     onRetry={() => retryDocument.mutate(document.id)}
+                    onEditMetadata={() => editDocumentMetadata(document)}
                   />
                 ))}
                 {selected && !documents.isLoading && !documents.data?.length && (
@@ -391,7 +463,7 @@ export function KnowledgeWorkspace({
             <h2 className="mt-2 font-serif text-2xl font-semibold">询问你的资料</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">检索结果只来自当前知识库，并保留文件名、标题和页码。</p>
             <form className="mt-6" onSubmit={submitSearch}>
-              <textarea className="search-box" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} disabled={!selected} placeholder="例如：哪些方法可以提高光伏功率预测精度？" />
+              <textarea className="search-box" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} disabled={!selected} placeholder={selected ? `例如：概括“${selected.name}”中最重要的方法与结论` : "请先选择知识库"} />
               <button className="primary-action mt-3 w-full" disabled={!selected || search.isPending || searchQuery.trim().length < 2} type="submit">
                 <FileSearch className="h-4 w-4" />{search.isPending ? "正在检索" : "检索相关片段"}
               </button>

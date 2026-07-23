@@ -30,6 +30,11 @@ import type {
   ServerStatus,
   UploadResponse,
   User,
+  UsageSummary,
+  AdminTemplate,
+  AdminTemplateSection,
+  ModerationItem,
+  Announcement,
 } from "@/contracts/api";
 
 export class ApiClientError extends Error {
@@ -134,8 +139,30 @@ export const api = {
   }) => jsonRequest<AuthResponse>("/api/v1/auth/register", "POST", payload),
   login: (payload: { email: string; password: string }) =>
     jsonRequest<AuthResponse>("/api/v1/auth/login", "POST", payload),
+  requestEmailCode: (
+    email: string,
+    purpose: "verify_email" | "reset_password",
+  ) =>
+    jsonRequest<void>("/api/v1/auth/email-code/request", "POST", {
+      email,
+      purpose,
+    }),
+  confirmEmailCode: (payload: {
+    email: string;
+    purpose: "verify_email" | "reset_password";
+    code: string;
+    new_password?: string;
+  }) =>
+    jsonRequest<void>("/api/v1/auth/email-code/confirm", "POST", payload),
   refresh: () => refreshAccessToken(),
   me: () => request<User>("/api/v1/auth/me"),
+  updateProfile: (payload: {
+    display_name: string;
+    avatar_url?: string;
+    bio?: string;
+  }) => jsonRequest<User>("/api/v1/users/me/profile", "PATCH", payload),
+  getUsage: () => request<UsageSummary>("/api/v1/users/me/usage"),
+  listAnnouncements: () => request<Announcement[]>("/api/v1/announcements"),
   logout: () => request<void>("/api/v1/auth/logout", { method: "POST" }, false),
   listKnowledgeBases: () => request<KnowledgeBase[]>("/api/v1/knowledge-bases"),
   createKnowledgeBase: (payload: { name: string; description?: string }) =>
@@ -428,10 +455,122 @@ export const api = {
       "POST",
       payload,
     ),
-  listAuditLogs: (action = "") =>
-    request<AuditLog[]>(
-      `/api/v1/admin/audit-logs${action ? `?action=${encodeURIComponent(action)}` : ""}`,
+  listAuditLogs: (filters: {
+    action?: string;
+    actor_user_id?: string;
+    start_at?: string;
+    end_at?: string;
+  } = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    return request<AuditLog[]>(
+      `/api/v1/admin/audit-logs${params.size ? `?${params}` : ""}`,
+    );
+  },
+  exportAuditLogs: async (filters: {
+    action?: string;
+    actor_user_id?: string;
+    start_at?: string;
+    end_at?: string;
+  } = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    const response = await authorizedFetch(
+      `/api/v1/admin/audit-logs/export.csv${params.size ? `?${params}` : ""}`,
+    );
+    const url = URL.createObjectURL(await response.blob());
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "audit-logs.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  },
+  listAdminTemplates: () =>
+    request<AdminTemplate[]>("/api/v1/admin/templates"),
+  createAdminTemplate: (payload: {
+    key: string;
+    name: string;
+    description?: string;
+  }) => jsonRequest<AdminTemplate>("/api/v1/admin/templates", "POST", payload),
+  updateAdminTemplate: (
+    id: string,
+    payload: { key: string; name: string; description?: string },
+  ) =>
+    jsonRequest<AdminTemplate>(`/api/v1/admin/templates/${id}`, "PUT", payload),
+  publishAdminTemplate: (
+    id: string,
+    payload: {
+      system_prompt: string;
+      settings: Record<string, unknown>;
+      sections: AdminTemplateSection[];
+    },
+  ) =>
+    jsonRequest<AdminTemplate>(
+      `/api/v1/admin/templates/${id}/publish`,
+      "POST",
+      payload,
     ),
+  deleteAdminTemplate: (id: string) =>
+    request<void>(`/api/v1/admin/templates/${id}`, { method: "DELETE" }),
+  listModeration: (status = "") =>
+    request<ModerationItem[]>(
+      `/api/v1/admin/moderation${status ? `?status=${status}` : ""}`,
+    ),
+  moderateContent: (
+    item: ModerationItem,
+    payload: {
+      status: ModerationItem["status"];
+      note: string;
+      disable_user?: boolean;
+      permanent_delete?: boolean;
+    },
+  ) =>
+    jsonRequest<ModerationItem>(
+      `/api/v1/admin/moderation/${item.content_type}/${item.content_id}`,
+      "PATCH",
+      payload,
+    ),
+  listAdminAnnouncements: () =>
+    request<Announcement[]>("/api/v1/admin/announcements"),
+  saveAnnouncement: (
+    id: string | null,
+    payload: Omit<Announcement, "id" | "created_at" | "updated_at">,
+  ) =>
+    jsonRequest<Announcement>(
+      id ? `/api/v1/admin/announcements/${id}` : "/api/v1/admin/announcements",
+      id ? "PUT" : "POST",
+      payload,
+    ),
+  deleteAnnouncement: (id: string) =>
+    request<void>(`/api/v1/admin/announcements/${id}`, { method: "DELETE" }),
+  resetUserPassword: (id: string, password: string) =>
+    jsonRequest<void>(`/api/v1/admin/users/${id}/reset-password`, "POST", {
+      password,
+    }),
+  updateDocumentMetadata: (
+    id: string,
+    payload: {
+      author?: string;
+      publication_title?: string;
+      publication_year?: number;
+      source?: string;
+      category?: string;
+      tags?: string[];
+      knowledge_base_id?: string;
+    },
+  ) => jsonRequest(`/api/v1/users/me/documents/${id}/metadata`, "PATCH", payload),
+  checkCitationIntegrity: (reportId: string) =>
+    request<{
+      valid: boolean;
+      warnings: string[];
+      missing_metadata_document_ids: string[];
+      dangling_markers: string[];
+      unused_citation_ids: string[];
+    }>(`/api/v1/users/me/reports/${reportId}/citation-integrity`),
   exportReport: async (reportId: string, title: string) => {
     const response = await authorizedFetch(
       `/api/v1/reports/${reportId}/export.docx`,

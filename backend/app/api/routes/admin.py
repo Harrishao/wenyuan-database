@@ -1,9 +1,12 @@
+import csv
 from datetime import UTC, datetime
+from io import StringIO
 from uuid import UUID
 
 import httpx
 import psutil
 from fastapi import APIRouter, BackgroundTasks, Query, Request
+from fastapi.responses import Response
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
@@ -887,6 +890,9 @@ async def list_audit_logs(
     session: SessionDep,
     admin: AdminUser,
     action: str | None = Query(default=None, max_length=120),
+    actor_user_id: UUID | None = None,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
     limit: int = Query(default=100, ge=1, le=500),
 ) -> list[AuditLogResponse]:
     del admin
@@ -898,6 +904,12 @@ async def list_audit_logs(
     )
     if action:
         statement = statement.where(AuditLog.action.ilike(f"%{action.strip()}%"))
+    if actor_user_id:
+        statement = statement.where(AuditLog.actor_user_id == actor_user_id)
+    if start_at:
+        statement = statement.where(AuditLog.created_at >= start_at)
+    if end_at:
+        statement = statement.where(AuditLog.created_at <= end_at)
     rows = (await session.execute(statement)).all()
     return [
         AuditLogResponse(
@@ -914,6 +926,46 @@ async def list_audit_logs(
         )
         for item, display_name in rows
     ]
+
+
+@router.get("/audit-logs/export.csv")
+async def export_audit_logs(
+    session: SessionDep,
+    admin: AdminUser,
+    action: str | None = Query(default=None, max_length=120),
+    actor_user_id: UUID | None = None,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+) -> Response:
+    items = await list_audit_logs(
+        session=session,
+        admin=admin,
+        action=action,
+        actor_user_id=actor_user_id,
+        start_at=start_at,
+        end_at=end_at,
+        limit=500,
+    )
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["时间", "操作者", "动作", "对象类型", "对象 ID", "结果", "IP"])
+    for item in items:
+        writer.writerow(
+            [
+                item.created_at.isoformat(),
+                item.actor_display_name or "",
+                item.action,
+                item.target_type,
+                item.target_id or "",
+                item.result,
+                item.ip_address or "",
+            ]
+        )
+    return Response(
+        content="\ufeff" + output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="audit-logs.csv"'},
+    )
 
 
 @router.post("/templates/{template_id}/versions", status_code=201)

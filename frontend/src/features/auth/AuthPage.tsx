@@ -2,13 +2,18 @@ import { FormEvent, useState } from "react";
 import { BookOpen, LockKeyhole } from "lucide-react";
 
 import { useAuthStore } from "@/features/auth/auth-store";
-import { ApiClientError } from "@/lib/api-client";
+import { ApiClientError, api } from "@/lib/api-client";
 
 export function AuthPage() {
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const displayNameExamples = ["林同学", "课题组成员", "机械工程研究者"];
+  const displayNameExample =
+    displayNameExamples[new Date().getDate() % displayNameExamples.length];
+  const [mode, setMode] = useState<"login" | "register" | "recover">("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { login, register } = useAuthStore();
@@ -19,7 +24,24 @@ export function AuthPage() {
     setError(null);
     try {
       if (mode === "register") await register(displayName, email, password);
-      else await login(email, password);
+      else if (mode === "recover") {
+        if (!codeSent) {
+          await api.requestEmailCode(email, "reset_password");
+          setCodeSent(true);
+          setError("验证码已发送，请查收邮件并填写新密码");
+        } else {
+          await api.confirmEmailCode({
+            email,
+            purpose: "reset_password",
+            code,
+            new_password: password,
+          });
+          setMode("login");
+          setCodeSent(false);
+          setCode("");
+          setError("密码已重置，请使用新密码登录");
+        }
+      } else await login(email, password);
     } catch (caught) {
       setError(caught instanceof ApiClientError ? caught.message : "无法连接服务，请检查一键启动窗口");
     } finally {
@@ -64,13 +86,13 @@ export function AuthPage() {
         <section className="flex items-center px-7 py-12 sm:px-12 lg:px-16">
           <div className="w-full max-w-md">
             <p className="font-mono text-xs tracking-[0.18em] text-cyan-700">
-              {mode === "login" ? "RETURN TO ARCHIVE" : "CREATE RESEARCH ID"}
+              {mode === "login" ? "RETURN TO ARCHIVE" : mode === "recover" ? "RECOVER ACCOUNT" : "CREATE RESEARCH ID"}
             </p>
             <h2 className="mt-4 font-serif text-4xl font-semibold text-[#132a36]">
-              {mode === "login" ? "继续整理你的资料" : "建立你的研究档案"}
+              {mode === "login" ? "继续整理你的资料" : mode === "recover" ? "找回账号密码" : "建立你的研究档案"}
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-500">
-              {mode === "login" ? "使用邮箱和密码进入工作台。" : "创建账号后即可建立第一个私有知识库。"}
+              {mode === "login" ? "使用邮箱和密码进入工作台。" : mode === "recover" ? "验证码十分钟内有效，使用后立即失效。" : "创建账号后即可建立第一个私有知识库。"}
             </p>
 
             <form className="mt-9 space-y-5" onSubmit={submit}>
@@ -84,7 +106,7 @@ export function AuthPage() {
                     minLength={2}
                     maxLength={80}
                     required
-                    placeholder="例如：林同学"
+                    placeholder={`例如：${displayNameExample}`}
                   />
                 </label>
               )}
@@ -100,7 +122,7 @@ export function AuthPage() {
                   placeholder="name@example.com"
                 />
               </label>
-              <label className="block">
+              {mode !== "recover" || codeSent ? <label className="block">
                 <span className="field-label">密码</span>
                 <input
                   className="field-input"
@@ -109,16 +131,22 @@ export function AuthPage() {
                   type="password"
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
                   minLength={8}
-                  required
+                  required={mode !== "recover" || codeSent}
                   placeholder="至少 8 位字符"
                 />
-              </label>
+              </label> : null}
+              {mode === "recover" && codeSent && (
+                <label className="block">
+                  <span className="field-label">邮箱验证码</span>
+                  <input className="field-input" value={code} onChange={(event) => setCode(event.target.value)} pattern="\d{6}" required placeholder="6 位验证码" />
+                </label>
+              )}
 
               {error && <p className="border-l-2 border-red-500 pl-3 text-sm text-red-700">{error}</p>}
 
               <button className="primary-action w-full" disabled={submitting} type="submit">
                 <LockKeyhole className="h-4 w-4" />
-                {submitting ? "正在验证" : mode === "login" ? "进入研究档案" : "创建并进入"}
+                {submitting ? "正在验证" : mode === "login" ? "进入研究档案" : mode === "recover" ? codeSent ? "确认重置密码" : "发送验证码" : "创建并进入"}
               </button>
             </form>
 
@@ -132,6 +160,15 @@ export function AuthPage() {
             >
               {mode === "login" ? "还没有账号？创建研究档案" : "已有账号？返回登录"}
             </button>
+            {mode === "login" && (
+              <button
+                className="ml-4 mt-6 text-sm text-slate-500 underline decoration-slate-300 underline-offset-4"
+                onClick={() => { setMode("recover"); setError(null); setCodeSent(false); }}
+                type="button"
+              >
+                忘记密码
+              </button>
+            )}
           </div>
         </section>
       </div>

@@ -10,6 +10,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   register: (displayName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  replaceUser: (user: User) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -45,4 +46,5 @@ export const useAuthStore = create<AuthState>((set) => ({
       set({ user: null });
     }
   },
+  replaceUser: (user) => set({ user }),
 }));

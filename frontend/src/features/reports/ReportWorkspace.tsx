@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
@@ -61,6 +61,16 @@ const versionReasons: Record<string, string> = {
 function versionReason(reason: string) {
   if (reason.startsWith("restore_v")) return `恢复自 v${reason.slice(9)}`;
   return versionReasons[reason] ?? reason;
+}
+
+function localDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 function MarkdownPreview({
@@ -165,6 +175,21 @@ export function ReportWorkspace({
     ? (drafts[selectedSection.key] ?? selectedSection.content_markdown)
     : "";
   const activeCitation = selectedCitation ?? selectedSection?.citations[0] ?? null;
+
+  async function exportCurrentReport() {
+    if (!report.data) return;
+    try {
+      const integrity = await api.checkCitationIntegrity(report.data.id);
+      if (!integrity.valid) {
+        setNotice(`导出前检查：${integrity.warnings.join("；")}`);
+        return;
+      }
+      await api.exportReport(report.data.id, report.data.title);
+      setNotice("DOCX 已导出，正文引用与文末参考文献已核对");
+    } catch (error) {
+      setNotice(errorText(error));
+    }
+  }
   const reportStatus = report.data?.status;
 
   useEffect(() => {
@@ -390,7 +415,8 @@ export function ReportWorkspace({
                 >
                   <span className="line-clamp-2 text-left font-medium">{item.title}</span>
                   <span className="mt-2 flex items-center justify-between font-mono text-[10px] text-slate-400">
-                    <span>{item.template_name}</span><span>v{item.current_version}</span>
+                    <span>{item.template_name}</span><span>{item.status === "ready" ? "已完成" : "草稿/处理中"}</span><span>v{item.current_version}</span>
+                    <span>{localDate(item.updated_at)}</span>
                   </span>
                 </button>
               ))}
@@ -421,10 +447,16 @@ export function ReportWorkspace({
                   <div className="min-w-0 flex-1">
                     <div className="report-kicker-row">
                       <p className="section-label">{report.data.template_name} · {report.data.knowledge_base_name}</p>
-                      <button className="compact-export" onClick={() => void api.exportReport(report.data!.id, report.data!.title)} type="button"><Download className="h-3.5 w-3.5" />导出 DOCX</button>
+                      <button className="compact-export" onClick={() => void exportCurrentReport()} type="button"><Download className="h-3.5 w-3.5" />校验并导出 DOCX</button>
                     </div>
                     <h1>{report.data.title}</h1>
                     <p className="mt-2 text-sm text-slate-500">版本 v{report.data.current_version} · 生成进度 {report.data.progress}%</p>
+                    {report.data.moderation_status !== "approved" && (
+                      <p className="mt-2 border-l-2 border-amber-600 pl-3 text-sm text-amber-800">
+                        内容审核状态：{report.data.moderation_status}
+                        {report.data.moderation_note ? ` · ${report.data.moderation_note}` : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="assembly-line" style={{ "--report-progress": `${report.data.progress}%` } as React.CSSProperties} />
@@ -671,12 +703,18 @@ export function ReportWorkspace({
             )}
             <div className="history-stack">
               <div className="flex items-center gap-2"><History className="h-4 w-4" /><p className="section-label">版本快照</p></div>
-              {versions.data?.slice(0, 6).map((item) => (
-                <button className={`history-row ${selectedVersion?.id === item.id ? "active" : ""}`} key={item.id} onClick={() => setSelectedVersion(item)} type="button">
+              {versions.data?.slice(0, 6).map((item, index, items) => (
+                <Fragment key={item.id}>
+                {(index === 0 || new Date(items[index - 1].created_at).toLocaleDateString() !== new Date(item.created_at).toLocaleDateString()) && (
+                  <p className="mt-3 text-xs font-medium text-slate-400">{new Date(item.created_at).toLocaleDateString()}</p>
+                )}
+                <button className={`history-row ${selectedVersion?.id === item.id ? "active" : ""}`} onClick={() => setSelectedVersion(item)} type="button">
                   <FileClock className="h-3.5 w-3.5" />
                   <span>v{item.version} · {versionReason(item.reason)}</span>
+                  <small>{localDate(item.created_at)}</small>
                   {item.version === report.data?.current_version ? <small>当前</small> : <ChevronRight className="ml-auto h-3.5 w-3.5" />}
                 </button>
+                </Fragment>
               ))}
               {selectedVersion && report.data && (
                 <div className="version-inspector">

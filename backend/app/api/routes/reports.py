@@ -16,7 +16,7 @@ from app.api.dependencies import CurrentUser, SessionDep
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.session import SessionFactory
-from app.domain.enums import ProcessingStatus, ReportStatus, TemplateStatus
+from app.domain.enums import ModerationStatus, ProcessingStatus, ReportStatus, TemplateStatus
 from app.domain.models import (
     BackgroundJob,
     Citation,
@@ -183,6 +183,8 @@ async def build_report_detail(session: AsyncSession, report: Report) -> ReportDe
         inputs=dict(version.generation_context.get("inputs", {})),
         progress=job.progress if job else (100 if report.status == ReportStatus.READY else 0),
         sensitive_hits=version.sensitive_hits,
+        moderation_status=version.moderation_status,
+        moderation_note=version.moderation_note,
         sections=section_responses,
     )
 
@@ -266,6 +268,9 @@ async def snapshot_version(
     report.current_version = new_version.version
     await rebuild_version_markdown(session, new_version)
     new_version.sensitive_hits = await scan_sensitive_text(session, new_version.content_markdown)
+    new_version.moderation_status = (
+        ModerationStatus.PENDING if new_version.sensitive_hits else ModerationStatus.APPROVED
+    )
     return new_version
 
 
@@ -606,6 +611,15 @@ async def export_report_docx(
 ) -> StreamingResponse:
     report = await get_owned_report(session, report_id, current_user.id)
     version = await get_current_version(session, report)
+    if version.moderation_status in {
+        ModerationStatus.RESTRICTED,
+        ModerationStatus.REMOVED,
+    }:
+        raise AppError(
+            "REPORT_CONTENT_RESTRICTED",
+            "当前报告版本已被限制或下架，不能导出",
+            status_code=403,
+        )
     sections = list(
         await session.scalars(
             select(ReportSection)
@@ -613,7 +627,57 @@ async def export_report_docx(
             .order_by(ReportSection.position)
         )
     )
-    payload = render_report_docx(report, sections)
+    citation_rows = (
+        await session.execute(
+            select(Citation, ReportSection, Document)
+            .join(ReportSection, ReportSection.id == Citation.report_section_id)
+            .join(DocumentChunk, DocumentChunk.id == Citation.document_chunk_id)
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .where(ReportSection.report_version_id == version.id)
+            .order_by(ReportSection.position, Citation.marker)
+        )
+    ).all()
+    citation_count = await session.scalar(
+        select(func.count(Citation.id))
+        .join(ReportSection, ReportSection.id == Citation.report_section_id)
+        .where(ReportSection.report_version_id == version.id)
+    )
+    if (citation_count or 0) != len(citation_rows):
+        raise AppError(
+            "REFERENCE_SOURCE_UNAVAILABLE",
+            "部分引用的原始文献已删除，无法生成一一对应的参考文献列表",
+            status_code=409,
+        )
+    references: list[Document] = []
+    reference_numbers: dict[UUID, int] = {}
+    citation_numbers: dict[UUID, dict[str, int]] = {}
+    for citation, section, document in citation_rows:
+        number = reference_numbers.get(document.id)
+        if number is None:
+            references.append(document)
+            number = len(references)
+            reference_numbers[document.id] = number
+        citation_numbers.setdefault(section.id, {})[citation.marker] = number
+    missing = [
+        item.original_filename
+        for item in references
+        if not all(
+            [
+                item.author,
+                item.publication_title or item.original_filename,
+                item.publication_year,
+                item.source,
+            ]
+        )
+    ]
+    if missing:
+        raise AppError(
+            "REFERENCE_METADATA_INCOMPLETE",
+            "参考文献元数据不完整，导出前请补充作者、年份和来源",
+            status_code=409,
+            details={"documents": missing},
+        )
+    payload = render_report_docx(report, sections, references, citation_numbers)
     filename = f"report-{report.id}.docx"
     return StreamingResponse(
         BytesIO(payload),

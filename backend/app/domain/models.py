@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 from app.domain.enums import (
+    ModerationStatus,
     ProcessingStatus,
     ReportStatus,
     TemplateStatus,
@@ -47,6 +48,9 @@ class User(UuidPrimaryKeyMixin, TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     display_name: Mapped[str] = mapped_column(String(80))
+    avatar_url: Mapped[str | None] = mapped_column(String(500))
+    bio: Mapped[str | None] = mapped_column(String(500))
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     role: Mapped[UserRole] = mapped_column(
         Enum(
             UserRole,
@@ -74,6 +78,19 @@ class RefreshToken(UuidPrimaryKeyMixin, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class EmailCode(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "email_codes"
+
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    purpose: Mapped[str] = mapped_column(String(40), index=True)
+    code_hash: Mapped[str] = mapped_column(String(255))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
 
@@ -112,6 +129,22 @@ class Document(UuidPrimaryKeyMixin, TimestampMixin, Base):
     parser_version: Mapped[str | None] = mapped_column(String(80))
     error_message: Mapped[str | None] = mapped_column(Text)
     sensitive_hits: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    author: Mapped[str | None] = mapped_column(String(255))
+    publication_title: Mapped[str | None] = mapped_column(String(500))
+    publication_year: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str | None] = mapped_column(String(500))
+    category: Mapped[str | None] = mapped_column(String(80))
+    tags: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    moderation_status: Mapped[ModerationStatus] = mapped_column(
+        Enum(
+            ModerationStatus,
+            name="moderation_status",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        default=ModerationStatus.APPROVED,
+        index=True,
+    )
+    moderation_note: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
         UniqueConstraint("knowledge_base_id", "sha256", name="uq_documents_knowledge_base_sha256"),
     )
@@ -219,6 +252,16 @@ class ReportVersion(UuidPrimaryKeyMixin, Base):
     content_markdown: Mapped[str] = mapped_column(Text)
     generation_context: Mapped[dict] = mapped_column(JSONB, default=dict)
     sensitive_hits: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    moderation_status: Mapped[ModerationStatus] = mapped_column(
+        Enum(
+            ModerationStatus,
+            name="moderation_status",
+            values_callable=lambda enum: [item.value for item in enum],
+        ),
+        default=ModerationStatus.APPROVED,
+        index=True,
+    )
+    moderation_note: Mapped[str | None] = mapped_column(Text)
     reason: Mapped[str] = mapped_column(String(80), default="manual_save")
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(
@@ -398,3 +441,15 @@ class AuditLog(UuidPrimaryKeyMixin, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
+
+
+class Announcement(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "announcements"
+
+    title: Mapped[str] = mapped_column(String(200))
+    content: Mapped[str] = mapped_column(Text)
+    pinned: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

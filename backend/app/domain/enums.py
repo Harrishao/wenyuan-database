@@ -31,3 +31,10 @@ class TemplateStatus(StrEnum):
     DRAFT = "draft"
     PUBLISHED = "published"
     ARCHIVED = "archived"
+
+
+class ModerationStatus(StrEnum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    RESTRICTED = "restricted"
+    REMOVED = "removed"

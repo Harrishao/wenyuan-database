@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.domain.enums import ProcessingStatus
+from app.domain.enums import ModerationStatus, ProcessingStatus
 
 
 class KnowledgeBaseCreate(BaseModel):
@@ -35,6 +35,14 @@ class DocumentResponse(BaseModel):
     summary: str | None
     keywords: list[str]
     sensitive_hits: list[dict]
+    author: str | None
+    publication_title: str | None
+    publication_year: int | None
+    source: str | None
+    category: str | None
+    tags: list[str]
+    moderation_status: ModerationStatus
+    moderation_note: str | None
     error_message: str | None
     chunk_count: int
     created_at: datetime

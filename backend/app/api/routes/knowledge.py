@@ -12,7 +12,7 @@ from app.adapters.local_file_storage import LocalFileStorage
 from app.api.dependencies import CurrentUser, SessionDep
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.domain.enums import ProcessingStatus
+from app.domain.enums import ModerationStatus, ProcessingStatus
 from app.domain.models import BackgroundJob, Document, DocumentChunk, KnowledgeBase
 from app.schemas.knowledge import (
     DocumentResponse,
@@ -66,6 +66,14 @@ def document_response(document: Document, chunk_count: int = 0) -> DocumentRespo
         summary=document.summary,
         keywords=document.keywords,
         sensitive_hits=document.sensitive_hits,
+        author=document.author,
+        publication_title=document.publication_title,
+        publication_year=document.publication_year,
+        source=document.source,
+        category=document.category,
+        tags=document.tags,
+        moderation_status=document.moderation_status,
+        moderation_note=document.moderation_note,
         error_message=document.error_message,
         chunk_count=chunk_count,
         created_at=document.created_at,
@@ -354,6 +362,9 @@ async def search_knowledge_base(
                 Document.knowledge_base_id == knowledge_base_id,
                 Document.uploaded_by == current_user.id,
                 Document.status == ProcessingStatus.SUCCEEDED,
+                Document.moderation_status.in_(
+                    [ModerationStatus.PENDING, ModerationStatus.APPROVED]
+                ),
                 DocumentChunk.embedding.is_not(None),
                 DocumentChunk.embedding_model == embedding.model_name,
             )

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.report_llm import LocalEvidenceDraftLlm
 from app.core.config import get_settings
 from app.db.session import SessionFactory
-from app.domain.enums import ProcessingStatus, ReportStatus
+from app.domain.enums import ModerationStatus, ProcessingStatus, ReportStatus
 from app.domain.models import (
     BackgroundJob,
     Citation,
@@ -253,6 +253,11 @@ async def generate_report_sections(
                 await rebuild_version_markdown(session, version)
                 version.sensitive_hits = await scan_sensitive_text(
                     session, version.content_markdown
+                )
+                version.moderation_status = (
+                    ModerationStatus.PENDING
+                    if version.sensitive_hits
+                    else ModerationStatus.APPROVED
                 )
                 await session.commit()
 

@@ -5,9 +5,10 @@ import { useAuthStore } from "@/features/auth/auth-store";
 import { AdminWorkspace } from "@/features/admin/AdminWorkspace";
 import { KnowledgeWorkspace } from "@/features/knowledge/KnowledgeWorkspace";
 import { ReportWorkspace } from "@/features/reports/ReportWorkspace";
+import { ProfileWorkspace } from "@/features/profile/ProfileWorkspace";
 
 export function AuthGate() {
-  const [workspace, setWorkspace] = useState<"knowledge" | "reports" | "admin">("knowledge");
+  const [workspace, setWorkspace] = useState<"knowledge" | "reports" | "admin" | "profile">("knowledge");
   const { user, initializing, bootstrap } = useAuthStore();
 
   useEffect(() => {
@@ -23,6 +24,9 @@ export function AuthGate() {
   }
 
   if (!user) return <AuthPage />;
+  if (workspace === "profile") {
+    return <ProfileWorkspace onBack={() => setWorkspace("knowledge")} />;
+  }
   if (workspace === "admin" && user.role === "admin") {
     return <AdminWorkspace onBack={() => setWorkspace("knowledge")} />;
   }
@@ -38,6 +42,7 @@ export function AuthGate() {
     <KnowledgeWorkspace
       onOpenAdmin={() => setWorkspace("admin")}
       onOpenReports={() => setWorkspace("reports")}
+      onOpenProfile={() => setWorkspace("profile")}
     />
   );
 }

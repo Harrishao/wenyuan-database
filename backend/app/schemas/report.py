@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
-from app.domain.enums import ProcessingStatus, ReportStatus
+from app.domain.enums import ModerationStatus, ProcessingStatus, ReportStatus
 
 
 class TemplateSectionResponse(BaseModel):
@@ -67,6 +67,8 @@ class ReportDetail(ReportListItem):
     inputs: dict[str, str]
     progress: int
     sensitive_hits: list[dict]
+    moderation_status: ModerationStatus
+    moderation_note: str | None
     sections: list[ReportSectionResponse]
 
 

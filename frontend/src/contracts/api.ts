@@ -21,6 +21,9 @@ export interface User {
   id: string;
   email: string;
   display_name: string;
+  avatar_url: string | null;
+  bio: string | null;
+  email_verified: boolean;
   role: "student" | "admin";
   status: "active" | "disabled";
   created_at: string;
@@ -55,6 +58,14 @@ export interface DocumentRecord {
   summary: string | null;
   keywords: string[];
   sensitive_hits: Array<Record<string, unknown>>;
+  author: string | null;
+  publication_title: string | null;
+  publication_year: number | null;
+  source: string | null;
+  category: string | null;
+  tags: string[];
+  moderation_status: "pending" | "approved" | "restricted" | "removed";
+  moderation_note: string | null;
   error_message: string | null;
   chunk_count: number;
   created_at: string;
@@ -138,6 +149,8 @@ export interface ReportDetail extends ReportListItem {
   inputs: Record<string, string>;
   progress: number;
   sensitive_hits: Array<Record<string, unknown>>;
+  moderation_status: "pending" | "approved" | "restricted" | "removed";
+  moderation_note: string | null;
   sections: ReportSection[];
 }
 
@@ -333,4 +346,65 @@ export interface AuditLog {
   details: Record<string, unknown>;
   ip_address: string | null;
   created_at: string;
+}
+
+export interface UsageSummary {
+  document_count: number;
+  report_count: number;
+  knowledge_base_count: number;
+  storage_bytes: number;
+  model_call_count: number;
+}
+
+export interface AdminTemplateSection {
+  key: string;
+  title: string;
+  position: number;
+  instructions: string;
+  required_inputs: string[];
+}
+
+export interface AdminTemplateVersion {
+  id: string;
+  version: number;
+  system_prompt: string;
+  settings: Record<string, unknown>;
+  sections: AdminTemplateSection[];
+  created_at: string;
+}
+
+export interface AdminTemplate {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  status: "draft" | "published" | "archived";
+  versions: AdminTemplateVersion[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ModerationItem {
+  content_type: "document" | "report";
+  content_id: string;
+  owner_id: string;
+  owner_display_name: string;
+  title: string;
+  summary: string;
+  hits: Array<Record<string, unknown>>;
+  status: "pending" | "approved" | "restricted" | "removed";
+  note: string | null;
+  created_at: string;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  pinned: boolean;
+  published_at: string | null;
+  expires_at: string | null;
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
 }

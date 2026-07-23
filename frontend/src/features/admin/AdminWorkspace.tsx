@@ -11,11 +11,14 @@ import {
   Database,
   FileClock,
   KeyRound,
+  LayoutTemplate,
+  Megaphone,
   Plus,
   RefreshCw,
   Save,
   Server,
   ShieldCheck,
+  Gavel,
   Trash2,
   Users,
   X,
@@ -30,9 +33,23 @@ import type {
   ServerStatus,
 } from "@/contracts/api";
 import { ApiClientError, api } from "@/lib/api-client";
+import {
+  AnnouncementManagement,
+  ModerationManagement,
+  TemplateManagement,
+} from "@/features/admin/Mvp5AdminPanel";
 
 type AdminTab =
-  "dashboard" | "llm" | "prompt" | "embedding" | "safety" | "users" | "audit";
+  | "dashboard"
+  | "llm"
+  | "prompt"
+  | "embedding"
+  | "safety"
+  | "templates"
+  | "moderation"
+  | "announcements"
+  | "users"
+  | "audit";
 
 const emptyLlmForm = {
   name: "",
@@ -139,7 +156,12 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
     terms: "",
     enabled: true,
   });
-  const [auditQuery, setAuditQuery] = useState("");
+  const [auditFilters, setAuditFilters] = useState({
+    action: "",
+    actor_user_id: "",
+    start_at: "",
+    end_at: "",
+  });
   const [logLevel, setLogLevel] = useState("");
   const [telemetry, setTelemetry] = useState<ServerStatus[]>([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -180,8 +202,17 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
     queryFn: api.listAdminUsers,
   });
   const audits = useQuery({
-    queryKey: ["admin-audits", auditQuery],
-    queryFn: () => api.listAuditLogs(auditQuery),
+    queryKey: ["admin-audits", auditFilters],
+    queryFn: () =>
+      api.listAuditLogs({
+        ...auditFilters,
+        start_at: auditFilters.start_at
+          ? new Date(auditFilters.start_at).toISOString()
+          : undefined,
+        end_at: auditFilters.end_at
+          ? new Date(auditFilters.end_at).toISOString()
+          : undefined,
+      }),
   });
   const logs = useQuery({
     queryKey: ["admin-application-logs", logLevel],
@@ -544,6 +575,9 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
               ["prompt", Braces, "提示词预设"],
               ["embedding", Database, "Embedding 预设"],
               ["safety", ShieldCheck, "敏感词"],
+              ["templates", LayoutTemplate, "报告模板"],
+              ["moderation", Gavel, "内容审核"],
+              ["announcements", Megaphone, "校园公告"],
               ["users", Users, "用户与用量"],
               ["audit", FileClock, "审计记录"],
             ].map(([key, Icon, label]) => (
@@ -1257,11 +1291,15 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
               onToggle={(id, status) => updateUser.mutate({ id, status })}
             />
           )}
+          {tab === "templates" && <TemplateManagement />}
+          {tab === "moderation" && <ModerationManagement />}
+          {tab === "announcements" && <AnnouncementManagement />}
           {tab === "audit" && (
             <AuditTable
               items={audits.data ?? []}
-              query={auditQuery}
-              onQuery={setAuditQuery}
+              filters={auditFilters}
+              users={users.data ?? []}
+              onFilters={setAuditFilters}
             />
           )}
         </section>
@@ -1656,12 +1694,24 @@ function UserTable({
 
 function AuditTable({
   items,
-  query,
-  onQuery,
+  filters,
+  users,
+  onFilters,
 }: {
   items: Awaited<ReturnType<typeof api.listAuditLogs>>;
-  query: string;
-  onQuery: (value: string) => void;
+  filters: {
+    action: string;
+    actor_user_id: string;
+    start_at: string;
+    end_at: string;
+  };
+  users: Awaited<ReturnType<typeof api.listAdminUsers>>;
+  onFilters: (value: {
+    action: string;
+    actor_user_id: string;
+    start_at: string;
+    end_at: string;
+  }) => void;
 }) {
   return (
     <section className="data-panel">
@@ -1673,11 +1723,20 @@ function AuditTable({
           <h2>审计记录</h2>
           <p>追踪管理员对用户、预设和敏感词分组的修改。</p>
         </div>
-        <input
-          placeholder="按动作前缀筛选"
-          value={query}
-          onChange={(event) => onQuery(event.target.value)}
-        />
+        <div className="grid gap-2">
+          <input placeholder="按动作筛选" value={filters.action} onChange={(event) => onFilters({ ...filters, action: event.target.value })} />
+          <select value={filters.actor_user_id} onChange={(event) => onFilters({ ...filters, actor_user_id: event.target.value })}>
+            <option value="">全部操作者</option>
+            {users.map((item) => <option key={item.id} value={item.id}>{item.display_name}</option>)}
+          </select>
+          <input type="datetime-local" value={filters.start_at} onChange={(event) => onFilters({ ...filters, start_at: event.target.value })} />
+          <input type="datetime-local" value={filters.end_at} onChange={(event) => onFilters({ ...filters, end_at: event.target.value })} />
+          <button onClick={() => void api.exportAuditLogs({
+            ...filters,
+            start_at: filters.start_at ? new Date(filters.start_at).toISOString() : undefined,
+            end_at: filters.end_at ? new Date(filters.end_at).toISOString() : undefined,
+          })}>导出 CSV</button>
+        </div>
       </div>
       <table>
         <thead>

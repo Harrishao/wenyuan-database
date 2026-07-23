@@ -9,7 +9,7 @@ from sqlalchemy import delete
 from app.adapters.local_file_storage import LocalFileStorage
 from app.core.config import get_settings
 from app.db.session import SessionFactory
-from app.domain.enums import ProcessingStatus
+from app.domain.enums import ModerationStatus, ProcessingStatus
 from app.domain.models import BackgroundJob, Document, DocumentChunk
 from app.services.ai_config import get_runtime_embedding
 from app.services.chunking import chunk_blocks
@@ -90,6 +90,9 @@ async def process_document(document_id: UUID, job_id: UUID) -> None:
             document.summary = re.sub(r"\s+", " ", full_text).strip()[:360]
             document.keywords = extract_keywords(full_text)
             document.sensitive_hits = await scan_sensitive_text(session, full_text)
+            document.moderation_status = (
+                ModerationStatus.PENDING if document.sensitive_hits else ModerationStatus.APPROVED
+            )
             document.parser_version = "mvp1-v1"
             document.status = ProcessingStatus.SUCCEEDED
             document.error_message = None
