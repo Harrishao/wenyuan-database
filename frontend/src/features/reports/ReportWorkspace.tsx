@@ -705,15 +705,33 @@ export function ReportWorkspace({
               <div className="flex items-center gap-2"><History className="h-4 w-4" /><p className="section-label">版本快照</p></div>
               {versions.data?.slice(0, 6).map((item, index, items) => (
                 <Fragment key={item.id}>
-                {(index === 0 || new Date(items[index - 1].created_at).toLocaleDateString() !== new Date(item.created_at).toLocaleDateString()) && (
-                  <p className="mt-3 text-xs font-medium text-slate-400">{new Date(item.created_at).toLocaleDateString()}</p>
-                )}
-                <button className={`history-row ${selectedVersion?.id === item.id ? "active" : ""}`} onClick={() => setSelectedVersion(item)} type="button">
-                  <FileClock className="h-3.5 w-3.5" />
-                  <span>v{item.version} · {versionReason(item.reason)}</span>
-                  <small>{localDate(item.created_at)}</small>
-                  {item.version === report.data?.current_version ? <small>当前</small> : <ChevronRight className="ml-auto h-3.5 w-3.5" />}
-                </button>
+                  {(index === 0 ||
+                    new Date(items[index - 1].created_at).toLocaleDateString() !==
+                      new Date(item.created_at).toLocaleDateString()) && (
+                    <p className="mt-3 text-xs font-medium text-slate-400">
+                      {new Date(item.created_at).toLocaleDateString()}
+                    </p>
+                  )}
+                  <button
+                    className={`history-row ${selectedVersion?.id === item.id ? "active" : ""}`}
+                    onClick={() => setSelectedVersion(item)}
+                    type="button"
+                  >
+                    <FileClock className="h-3.5 w-3.5 flex-shrink-0" />
+                    <span className="history-title">
+                      v{item.version} · {versionReason(item.reason)}
+                    </span>
+                    <small className="history-time">
+                      {localDate(item.created_at)}
+                    </small>
+                    <div className="history-badge">
+                      {item.version === report.data?.current_version ? (
+                        <small>当前</small>
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      )}
+                    </div>
+                  </button>
                 </Fragment>
               ))}
               {selectedVersion && report.data && (
