@@ -12,6 +12,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  ShieldCheck,
   Trash2,
   Upload,
   X,
@@ -85,7 +86,13 @@ function DocumentRow({
   );
 }
 
-export function KnowledgeWorkspace({ onOpenReports }: { onOpenReports: () => void }) {
+export function KnowledgeWorkspace({
+  onOpenReports,
+  onOpenAdmin,
+}: {
+  onOpenReports: () => void;
+  onOpenAdmin: () => void;
+}) {
   const queryClient = useQueryClient();
   const fileInput = useRef<HTMLInputElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -221,6 +228,11 @@ export function KnowledgeWorkspace({ onOpenReports }: { onOpenReports: () => voi
             <button className="quiet-action" onClick={onOpenReports} type="button">
               <FileText className="h-4 w-4" />报告装配台
             </button>
+            {user?.role === "admin" && (
+              <button className="quiet-action" onClick={onOpenAdmin} type="button">
+                <ShieldCheck className="h-4 w-4" />管理控制台
+              </button>
+            )}
             <span className="hidden text-slate-500 sm:inline">{user?.display_name}</span>
             <button className="quiet-action" onClick={() => void logout()} type="button">
               <LogOut className="h-4 w-4" />退出

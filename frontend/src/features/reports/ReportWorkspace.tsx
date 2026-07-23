@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ScanSearch,
   Search,
+  ShieldCheck,
   WandSparkles,
   X,
 } from "lucide-react";
@@ -104,7 +105,13 @@ function MarkdownPreview({
   );
 }
 
-export function ReportWorkspace({ onOpenKnowledge }: { onOpenKnowledge: () => void }) {
+export function ReportWorkspace({
+  onOpenKnowledge,
+  onOpenAdmin,
+}: {
+  onOpenKnowledge: () => void;
+  onOpenAdmin: () => void;
+}) {
   const queryClient = useQueryClient();
   const { user, logout } = useAuthStore();
   const [creating, setCreating] = useState(false);
@@ -338,6 +345,11 @@ export function ReportWorkspace({ onOpenKnowledge }: { onOpenKnowledge: () => vo
             <button className="quiet-action" onClick={onOpenKnowledge} type="button">
               <Library className="h-4 w-4" />返回知识库
             </button>
+            {user?.role === "admin" && (
+              <button className="quiet-action" onClick={onOpenAdmin} type="button">
+                <ShieldCheck className="h-4 w-4" />管理控制台
+              </button>
+            )}
             <span className="hidden text-slate-500 md:inline">{user?.display_name}</span>
             <button className="quiet-action" onClick={() => void logout()} type="button">
               <LogOut className="h-4 w-4" />退出

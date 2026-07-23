@@ -7,17 +7,17 @@ from uuid import UUID
 from sqlalchemy import delete
 
 from app.adapters.local_file_storage import LocalFileStorage
-from app.adapters.local_hashing_embedding import LocalHashingEmbedding
 from app.core.config import get_settings
 from app.db.session import SessionFactory
 from app.domain.enums import ProcessingStatus
 from app.domain.models import BackgroundJob, Document, DocumentChunk
+from app.services.ai_config import get_runtime_embedding
 from app.services.chunking import chunk_blocks
 from app.services.document_parser import parse_document
+from app.services.sensitive_scan import scan_sensitive_text
 
 settings = get_settings()
 storage = LocalFileStorage(settings.storage_root)
-embedding = LocalHashingEmbedding(settings.embedding_dimensions)
 STOP_WORDS = {"本文", "研究", "系统", "方法", "通过", "进行", "基于", "以及", "中的", "可以"}
 
 
@@ -55,6 +55,8 @@ async def process_document(document_id: UUID, job_id: UUID) -> None:
         )
         if not chunks:
             raise ValueError("文档没有产生有效片段")
+        async with SessionFactory() as config_session:
+            embedding = await get_runtime_embedding(config_session)
         vectors = await embedding.embed_documents([chunk.content for chunk in chunks])
         full_text = "\n".join(block.text for block in blocks)
 
@@ -87,6 +89,7 @@ async def process_document(document_id: UUID, job_id: UUID) -> None:
             )
             document.summary = re.sub(r"\s+", " ", full_text).strip()[:360]
             document.keywords = extract_keywords(full_text)
+            document.sensitive_hits = await scan_sensitive_text(session, full_text)
             document.parser_version = "mvp1-v1"
             document.status = ProcessingStatus.SUCCEEDED
             document.error_message = None

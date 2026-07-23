@@ -8,7 +8,6 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
-    Index,
     Integer,
     Numeric,
     String,
@@ -27,8 +26,6 @@ from app.domain.enums import (
     UserRole,
     UserStatus,
 )
-
-EMBEDDING_DIMENSIONS = 512
 
 
 class UuidPrimaryKeyMixin:
@@ -114,6 +111,7 @@ class Document(UuidPrimaryKeyMixin, TimestampMixin, Base):
     keywords: Mapped[list[str]] = mapped_column(JSONB, default=list)
     parser_version: Mapped[str | None] = mapped_column(String(80))
     error_message: Mapped[str | None] = mapped_column(Text)
+    sensitive_hits: Mapped[list[dict]] = mapped_column(JSONB, default=list)
     __table_args__ = (
         UniqueConstraint("knowledge_base_id", "sha256", name="uq_documents_knowledge_base_sha256"),
     )
@@ -130,17 +128,11 @@ class DocumentChunk(UuidPrimaryKeyMixin, TimestampMixin, Base):
     heading: Mapped[str | None] = mapped_column(String(500))
     page_number: Mapped[int | None] = mapped_column(Integer)
     char_count: Mapped[int] = mapped_column(Integer)
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
+    embedding: Mapped[list[float] | None] = mapped_column(Vector())
     embedding_model: Mapped[str | None] = mapped_column(String(255))
     processing_version: Mapped[str] = mapped_column(String(80), default="v1")
     __table_args__ = (
         UniqueConstraint("document_id", "position", name="uq_document_chunks_document_position"),
-        Index(
-            "ix_document_chunks_embedding_hnsw",
-            "embedding",
-            postgresql_using="hnsw",
-            postgresql_ops={"embedding": "vector_cosine_ops"},
-        ),
     )
 
 
@@ -226,6 +218,7 @@ class ReportVersion(UuidPrimaryKeyMixin, Base):
     version: Mapped[int] = mapped_column(Integer)
     content_markdown: Mapped[str] = mapped_column(Text)
     generation_context: Mapped[dict] = mapped_column(JSONB, default=dict)
+    sensitive_hits: Mapped[list[dict]] = mapped_column(JSONB, default=list)
     reason: Mapped[str] = mapped_column(String(80), default="manual_save")
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(
@@ -342,6 +335,51 @@ class SensitiveTerm(UuidPrimaryKeyMixin, TimestampMixin, Base):
     term: Mapped[str] = mapped_column(String(255), unique=True)
     category: Mapped[str] = mapped_column(String(80), default="general")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class PromptPreset(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "prompt_presets"
+
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    description: Mapped[str | None] = mapped_column(Text)
+    messages: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class EmbeddingPreset(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "embedding_presets"
+
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    provider: Mapped[str] = mapped_column(String(40), default="local_hashing")
+    base_url: Mapped[str | None] = mapped_column(String(500))
+    api_key_ciphertext: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(String(255))
+    dimensions: Mapped[int] = mapped_column(Integer, default=512)
+    parameters: Mapped[dict] = mapped_column(JSONB, default=dict)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class LlmPreset(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "llm_presets"
+
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    base_url: Mapped[str] = mapped_column(String(500))
+    api_key_ciphertext: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str] = mapped_column(String(255))
+    parameters: Mapped[dict] = mapped_column(JSONB, default=dict)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    bound_prompt_preset_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("prompt_presets.id", ondelete="SET NULL")
+    )
+    bound_embedding_preset_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("embedding_presets.id", ondelete="SET NULL")
+    )
     created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
 

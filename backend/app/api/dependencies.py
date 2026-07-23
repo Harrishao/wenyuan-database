@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import AppError
 from app.core.security import decode_token
 from app.db.session import get_session
-from app.domain.enums import UserStatus
+from app.domain.enums import UserRole, UserStatus
 from app.domain.models import User
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -35,3 +35,12 @@ async def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def get_admin_user(current_user: CurrentUser) -> User:
+    if current_user.role != UserRole.ADMIN:
+        raise AppError("ADMIN_REQUIRED", "需要管理员权限", status_code=403)
+    return current_user
+
+
+AdminUser = Annotated[User, Depends(get_admin_user)]

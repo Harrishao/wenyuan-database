@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.adapters.report_llm import OpenAICompatibleLlm
 from app.api.dependencies import CurrentUser, SessionDep
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -55,6 +56,7 @@ from app.schemas.report import (
     TemplateSectionResponse,
 )
 from app.services.academic_tools import answer_with_evidence, polish_text
+from app.services.ai_config import get_runtime_llm
 from app.services.docx_export import render_report_docx
 from app.services.report_generation import (
     generate_report_sections,
@@ -62,6 +64,7 @@ from app.services.report_generation import (
     retrieve_evidence,
 )
 from app.services.report_templates import ensure_builtin_templates
+from app.services.sensitive_scan import scan_sensitive_text
 from app.services.similarity import find_similarity_candidates
 
 templates_router = APIRouter()
@@ -179,6 +182,7 @@ async def build_report_detail(session: AsyncSession, report: Report) -> ReportDe
         updated_at=report.updated_at,
         inputs=dict(version.generation_context.get("inputs", {})),
         progress=job.progress if job else (100 if report.status == ReportStatus.READY else 0),
+        sensitive_hits=version.sensitive_hits,
         sections=section_responses,
     )
 
@@ -195,6 +199,7 @@ async def snapshot_version(
         version=report.current_version + 1,
         content_markdown=source.content_markdown,
         generation_context=dict(source.generation_context),
+        sensitive_hits=list(source.sensitive_hits),
         reason=reason,
         created_by=report.owner_id,
     )
@@ -260,6 +265,7 @@ async def snapshot_version(
         )
     report.current_version = new_version.version
     await rebuild_version_markdown(session, new_version)
+    new_version.sensitive_hits = await scan_sensitive_text(session, new_version.content_markdown)
     return new_version
 
 
@@ -472,9 +478,7 @@ async def get_report(
 
 
 @reports_router.delete("/{report_id}", status_code=204)
-async def delete_report(
-    report_id: UUID, session: SessionDep, current_user: CurrentUser
-) -> None:
+async def delete_report(report_id: UUID, session: SessionDep, current_user: CurrentUser) -> None:
     report = await get_owned_report(session, report_id, current_user.id)
     await session.delete(report)
     await session.commit()
@@ -776,7 +780,12 @@ async def preview_report_polish(
             "待润色文字已不在当前章节中，请重新选择",
             status_code=409,
         )
-    polished, model = await polish_text(payload.text, payload.style)
+    runtime_llm = await get_runtime_llm(session)
+    polished, model = await polish_text(
+        payload.text,
+        payload.style,
+        runtime_llm if isinstance(runtime_llm, OpenAICompatibleLlm) else None,
+    )
     return PolishPreviewResponse(
         section_key=payload.section_key,
         style=payload.style,
@@ -860,12 +869,14 @@ async def ask_report_assistant(
         }
         for index, (chunk, document_name, similarity) in enumerate(evidence_rows, start=1)
     ]
+    runtime_llm = await get_runtime_llm(session)
     answer, markers, model = await answer_with_evidence(
         role=payload.role,
         mode=payload.mode,
         question=payload.question,
         report_context=context,
         evidence=evidence_payload,
+        llm=runtime_llm if isinstance(runtime_llm, OpenAICompatibleLlm) else None,
     )
     return AssistantResponse(
         role=payload.role,

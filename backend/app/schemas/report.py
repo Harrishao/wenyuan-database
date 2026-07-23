@@ -66,6 +66,7 @@ class ReportListItem(BaseModel):
 class ReportDetail(ReportListItem):
     inputs: dict[str, str]
     progress: int
+    sensitive_hits: list[dict]
     sections: list[ReportSectionResponse]
 
 

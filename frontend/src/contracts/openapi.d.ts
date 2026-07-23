@@ -468,10 +468,468 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Users */
+        get: operations["list_users_api_v1_admin_users_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update User */
+        patch: operations["update_user_api_v1_admin_users__user_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/admin/llm-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Llm Presets */
+        get: operations["list_llm_presets_api_v1_admin_llm_presets_get"];
+        put?: never;
+        /** Create Llm Preset */
+        post: operations["create_llm_preset_api_v1_admin_llm_presets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/llm-presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Llm Preset */
+        put: operations["update_llm_preset_api_v1_admin_llm_presets__preset_id__put"];
+        post?: never;
+        /** Delete Llm Preset */
+        delete: operations["delete_llm_preset_api_v1_admin_llm_presets__preset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/llm-presets/{preset_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Llm */
+        post: operations["activate_llm_api_v1_admin_llm_presets__preset_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/llm-presets/{preset_id}/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fetch Llm Models */
+        get: operations["fetch_llm_models_api_v1_admin_llm_presets__preset_id__models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/prompt-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Prompt Presets */
+        get: operations["list_prompt_presets_api_v1_admin_prompt_presets_get"];
+        put?: never;
+        /** Create Prompt Preset */
+        post: operations["create_prompt_preset_api_v1_admin_prompt_presets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/prompt-presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Prompt Preset */
+        put: operations["update_prompt_preset_api_v1_admin_prompt_presets__preset_id__put"];
+        post?: never;
+        /** Delete Prompt Preset */
+        delete: operations["delete_prompt_preset_api_v1_admin_prompt_presets__preset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/prompt-presets/{preset_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Prompt */
+        post: operations["activate_prompt_api_v1_admin_prompt_presets__preset_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/embedding-presets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Embedding Presets */
+        get: operations["list_embedding_presets_api_v1_admin_embedding_presets_get"];
+        put?: never;
+        /** Create Embedding Preset */
+        post: operations["create_embedding_preset_api_v1_admin_embedding_presets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/embedding-presets/{preset_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Embedding Preset */
+        put: operations["update_embedding_preset_api_v1_admin_embedding_presets__preset_id__put"];
+        post?: never;
+        /** Delete Embedding Preset */
+        delete: operations["delete_embedding_preset_api_v1_admin_embedding_presets__preset_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/embedding-presets/{preset_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate Embedding */
+        post: operations["activate_embedding_api_v1_admin_embedding_presets__preset_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/embedding-presets/{preset_id}/reindex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reindex Documents */
+        post: operations["reindex_documents_api_v1_admin_embedding_presets__preset_id__reindex_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/runtime-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Runtime Config */
+        get: operations["runtime_config_api_v1_admin_runtime_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/server-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Server Status */
+        get: operations["server_status_api_v1_admin_server_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/application-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Application Logs */
+        get: operations["application_logs_api_v1_admin_application_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/sensitive-term-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sensitive Groups */
+        get: operations["list_sensitive_groups_api_v1_admin_sensitive_term_groups_get"];
+        put?: never;
+        /** Create Sensitive Group */
+        post: operations["create_sensitive_group_api_v1_admin_sensitive_term_groups_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/sensitive-term-groups/{group_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Sensitive Group */
+        put: operations["update_sensitive_group_api_v1_admin_sensitive_term_groups__group_name__put"];
+        post?: never;
+        /** Delete Sensitive Group */
+        delete: operations["delete_sensitive_group_api_v1_admin_sensitive_term_groups__group_name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/sensitive-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sensitive Terms */
+        get: operations["list_sensitive_terms_api_v1_admin_sensitive_terms_get"];
+        put?: never;
+        /** Create Sensitive Term */
+        post: operations["create_sensitive_term_api_v1_admin_sensitive_terms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/sensitive-terms/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Sensitive Terms */
+        post: operations["import_sensitive_terms_api_v1_admin_sensitive_terms_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Audit Logs */
+        get: operations["list_audit_logs_api_v1_admin_audit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/templates/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Template Version */
+        post: operations["create_template_version_api_v1_admin_templates__template_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ActivatePresetRequest */
+        ActivatePresetRequest: {
+            /**
+             * Sync Bindings
+             * @default true
+             */
+            sync_bindings: boolean;
+        };
+        /** AdminTemplateSectionInput */
+        AdminTemplateSectionInput: {
+            /** Key */
+            key: string;
+            /** Title */
+            title: string;
+            /** Position */
+            position: number;
+            /** Instructions */
+            instructions: string;
+            /** Required Inputs */
+            required_inputs?: string[];
+        };
+        /** AdminTemplateVersionCreate */
+        AdminTemplateVersionCreate: {
+            /** System Prompt */
+            system_prompt: string;
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+            /** Sections */
+            sections: components["schemas"]["AdminTemplateSectionInput"][];
+        };
+        /** AdminUserResponse */
+        AdminUserResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Display Name */
+            display_name: string;
+            role: components["schemas"]["UserRole"];
+            status: components["schemas"]["UserStatus"];
+            /** Document Count */
+            document_count: number;
+            /** Report Count */
+            report_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AdminUserUpdate */
+        AdminUserUpdate: {
+            status: components["schemas"]["UserStatus"];
+        };
+        /** ApplicationLogResponse */
+        ApplicationLogResponse: {
+            /**
+             * Timestamp
+             * Format: date-time
+             */
+            timestamp: string;
+            /** Level */
+            level: string;
+            /** Logger */
+            logger: string;
+            /** Message */
+            message: string;
+            /** Request Id */
+            request_id?: string | null;
+        };
         /** AssistantEvidenceResponse */
         AssistantEvidenceResponse: {
             /** Marker */
@@ -526,6 +984,37 @@ export interface components {
             model: string;
             /** Evidence */
             evidence: components["schemas"]["AssistantEvidenceResponse"][];
+        };
+        /** AuditLogResponse */
+        AuditLogResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Actor User Id */
+            actor_user_id: string | null;
+            /** Actor Display Name */
+            actor_display_name: string | null;
+            /** Action */
+            action: string;
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: string | null;
+            /** Result */
+            result: string;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /** Ip Address */
+            ip_address: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** AuthResponse */
         AuthResponse: {
@@ -586,10 +1075,74 @@ export interface components {
             summary: string | null;
             /** Keywords */
             keywords: string[];
+            /** Sensitive Hits */
+            sensitive_hits: {
+                [key: string]: unknown;
+            }[];
             /** Error Message */
             error_message: string | null;
             /** Chunk Count */
             chunk_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** EmbeddingPresetInput */
+        EmbeddingPresetInput: {
+            /** Name */
+            name: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "local_hashing" | "openai_compatible";
+            /** Base Url */
+            base_url?: string | null;
+            /** Api Key */
+            api_key?: string | null;
+            /** Model */
+            model: string;
+            /** Dimensions */
+            dimensions: number;
+            /** Parameters */
+            parameters?: {
+                [key: string]: unknown;
+            };
+        };
+        /** EmbeddingPresetResponse */
+        EmbeddingPresetResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+            /** Base Url */
+            base_url: string | null;
+            /** Model */
+            model: string;
+            /** Dimensions */
+            dimensions: number;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Has Api Key */
+            has_api_key: boolean;
+            /** Version */
+            version: number;
+            /** Is Active */
+            is_active: boolean;
             /**
              * Created At
              * Format: date-time
@@ -693,6 +1246,63 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** LlmPresetInput */
+        LlmPresetInput: {
+            /** Name */
+            name: string;
+            /** Base Url */
+            base_url: string;
+            /** Api Key */
+            api_key?: string | null;
+            /** Model */
+            model: string;
+            /** Parameters */
+            parameters?: {
+                [key: string]: unknown;
+            };
+            /** Bound Prompt Preset Id */
+            bound_prompt_preset_id?: string | null;
+            /** Bound Embedding Preset Id */
+            bound_embedding_preset_id?: string | null;
+        };
+        /** LlmPresetResponse */
+        LlmPresetResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Base Url */
+            base_url: string;
+            /** Model */
+            model: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Has Api Key */
+            has_api_key: boolean;
+            /** Version */
+            version: number;
+            /** Is Active */
+            is_active: boolean;
+            /** Bound Prompt Preset Id */
+            bound_prompt_preset_id: string | null;
+            /** Bound Embedding Preset Id */
+            bound_embedding_preset_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -702,6 +1312,11 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** ModelListResponse */
+        ModelListResponse: {
+            /** Models */
+            models: string[];
         };
         /** PolishAcceptRequest */
         PolishAcceptRequest: {
@@ -750,6 +1365,62 @@ export interface components {
          * @enum {string}
          */
         ProcessingStatus: "pending" | "running" | "succeeded" | "failed" | "cancelled";
+        /** PromptMessageInput */
+        PromptMessageInput: {
+            /** Name */
+            name: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "system" | "user" | "assistant";
+            /** Content */
+            content: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Position */
+            position: number;
+        };
+        /** PromptPresetInput */
+        PromptPresetInput: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Messages */
+            messages: components["schemas"]["PromptMessageInput"][];
+        };
+        /** PromptPresetResponse */
+        PromptPresetResponse: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Messages */
+            messages: components["schemas"]["PromptMessageInput"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Version */
+            version: number;
+            /** Is Active */
+            is_active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
         /** RegisterRequest */
         RegisterRequest: {
             /**
@@ -819,6 +1490,10 @@ export interface components {
             };
             /** Progress */
             progress: number;
+            /** Sensitive Hits */
+            sensitive_hits: {
+                [key: string]: unknown;
+            }[];
             /** Sections */
             sections: components["schemas"]["ReportSectionResponse"][];
         };
@@ -922,6 +1597,20 @@ export interface components {
              */
             created_at: string;
         };
+        /** RuntimeConfigResponse */
+        RuntimeConfigResponse: {
+            /** Llm Preset Id */
+            llm_preset_id: string | null;
+            /** Prompt Preset Id */
+            prompt_preset_id: string | null;
+            /** Embedding Preset Id */
+            embedding_preset_id: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "database" | "environment" | "offline";
+        };
         /** SearchRequest */
         SearchRequest: {
             /** Query */
@@ -972,6 +1661,102 @@ export interface components {
              */
             reason: string;
         };
+        /** SensitiveGroupInput */
+        SensitiveGroupInput: {
+            /** Name */
+            name: string;
+            /** Terms */
+            terms: string[];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** SensitiveGroupResponse */
+        SensitiveGroupResponse: {
+            /** Name */
+            name: string;
+            /** Terms */
+            terms: string[];
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Count */
+            count: number;
+        };
+        /** SensitiveTermImport */
+        SensitiveTermImport: {
+            /** Terms */
+            terms: components["schemas"]["SensitiveTermInput"][];
+        };
+        /** SensitiveTermInput */
+        SensitiveTermInput: {
+            /** Term */
+            term: string;
+            /**
+             * Category
+             * @default general
+             */
+            category: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** SensitiveTermResponse */
+        SensitiveTermResponse: {
+            /** Term */
+            term: string;
+            /**
+             * Category
+             * @default general
+             */
+            category: string;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ServerStatusResponse */
+        ServerStatusResponse: {
+            /** Cpu Percent */
+            cpu_percent: number;
+            /** Memory Percent */
+            memory_percent: number;
+            /** Memory Used Bytes */
+            memory_used_bytes: number;
+            /** Memory Total Bytes */
+            memory_total_bytes: number;
+            /** Process Rss Bytes */
+            process_rss_bytes: number;
+            /** Uptime Seconds */
+            uptime_seconds: number;
+            /**
+             * Sampled At
+             * Format: date-time
+             */
+            sampled_at: string;
+        };
         /** SimilarityJobResponse */
         SimilarityJobResponse: {
             /**
@@ -986,7 +1771,7 @@ export interface components {
             overall_ratio: number;
             /**
              * Metric Label
-             * @default 高相似文本占比
+             * @default �������ı�ռ��
              */
             metric_label: string;
             /** Parameters */
@@ -2073,6 +2858,917 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssistantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_users_api_v1_admin_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"][];
+                };
+            };
+        };
+    };
+    update_user_api_v1_admin_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_llm_presets_api_v1_admin_llm_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmPresetResponse"][];
+                };
+            };
+        };
+    };
+    create_llm_preset_api_v1_admin_llm_presets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmPresetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmPresetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_llm_preset_api_v1_admin_llm_presets__preset_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmPresetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmPresetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_llm_preset_api_v1_admin_llm_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_llm_api_v1_admin_llm_presets__preset_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivatePresetRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fetch_llm_models_api_v1_admin_llm_presets__preset_id__models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompt_presets_api_v1_admin_prompt_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptPresetResponse"][];
+                };
+            };
+        };
+    };
+    create_prompt_preset_api_v1_admin_prompt_presets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptPresetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptPresetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_prompt_preset_api_v1_admin_prompt_presets__preset_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptPresetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptPresetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_prompt_preset_api_v1_admin_prompt_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_prompt_api_v1_admin_prompt_presets__preset_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_embedding_presets_api_v1_admin_embedding_presets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingPresetResponse"][];
+                };
+            };
+        };
+    };
+    create_embedding_preset_api_v1_admin_embedding_presets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmbeddingPresetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingPresetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_embedding_preset_api_v1_admin_embedding_presets__preset_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmbeddingPresetInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmbeddingPresetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_embedding_preset_api_v1_admin_embedding_presets__preset_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_embedding_api_v1_admin_embedding_presets__preset_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reindex_documents_api_v1_admin_embedding_presets__preset_id__reindex_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                preset_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    runtime_config_api_v1_admin_runtime_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeConfigResponse"];
+                };
+            };
+        };
+    };
+    server_status_api_v1_admin_server_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerStatusResponse"];
+                };
+            };
+        };
+    };
+    application_logs_api_v1_admin_application_logs_get: {
+        parameters: {
+            query?: {
+                level?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationLogResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sensitive_groups_api_v1_admin_sensitive_term_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensitiveGroupResponse"][];
+                };
+            };
+        };
+    };
+    create_sensitive_group_api_v1_admin_sensitive_term_groups_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SensitiveGroupInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensitiveGroupResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_sensitive_group_api_v1_admin_sensitive_term_groups__group_name__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SensitiveGroupInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensitiveGroupResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_sensitive_group_api_v1_admin_sensitive_term_groups__group_name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sensitive_terms_api_v1_admin_sensitive_terms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensitiveTermResponse"][];
+                };
+            };
+        };
+    };
+    create_sensitive_term_api_v1_admin_sensitive_terms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SensitiveTermInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensitiveTermResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_sensitive_terms_api_v1_admin_sensitive_terms_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SensitiveTermImport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SensitiveTermResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_audit_logs_api_v1_admin_audit_logs_get: {
+        parameters: {
+            query?: {
+                action?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLogResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_template_version_api_v1_admin_templates__template_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminTemplateVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

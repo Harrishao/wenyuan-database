@@ -63,8 +63,12 @@ def _offline_polish(text: str, style: PolishStyle) -> str:
     return "".join(deduplicated).replace("在一定程度上", "").replace("需要指出的是，", "")
 
 
-async def polish_text(text: str, style: PolishStyle) -> tuple[str, str]:
-    llm = _external_llm()
+async def polish_text(
+    text: str,
+    style: PolishStyle,
+    llm: OpenAICompatibleLlm | None = None,
+) -> tuple[str, str]:
+    llm = llm or _external_llm()
     if llm is None:
         return _offline_polish(text, style), "local-rule-polisher-v1"
     prompt = (
@@ -73,8 +77,10 @@ async def polish_text(text: str, style: PolishStyle) -> tuple[str, str]:
         f"{text}"
     )
     result = await llm.chat(
-        [ChatMessage(role="system", content="你是学术文本编辑。不得补充原文没有的事实。"),
-         ChatMessage(role="user", content=prompt)],
+        [
+            ChatMessage(role="system", content="你是学术文本编辑。不得补充原文没有的事实。"),
+            ChatMessage(role="user", content=prompt),
+        ],
         ChatOptions(temperature=0.35, max_tokens=1200),
     )
     return result.strip(), llm.model_name
@@ -87,8 +93,9 @@ async def answer_with_evidence(
     question: str,
     report_context: str,
     evidence: list[dict],
+    llm: OpenAICompatibleLlm | None = None,
 ) -> tuple[str, list[int], str]:
-    llm = _external_llm()
+    llm = llm or _external_llm()
     if not evidence:
         return "当前知识库没有足够证据回答该问题，请补充相关文献。", [], "no-evidence"
     payload = json.dumps(
@@ -110,8 +117,10 @@ async def answer_with_evidence(
         answer = f"{prefix}{ROLE_PROMPTS[role]}\n\n" + "\n\n".join(excerpts)
         return answer, list(range(1, len(excerpts) + 1)), "local-evidence-assistant-v1"
     answer = await llm.chat(
-        [ChatMessage(role="system", content=ROLE_PROMPTS[role]),
-         ChatMessage(role="user", content=payload)],
+        [
+            ChatMessage(role="system", content=ROLE_PROMPTS[role]),
+            ChatMessage(role="user", content=payload),
+        ],
         ChatOptions(temperature=0.2, max_tokens=1200),
     )
     cleaned, markers = validate_citation_markers(answer, len(evidence))

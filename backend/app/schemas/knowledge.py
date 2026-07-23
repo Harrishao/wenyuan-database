@@ -34,6 +34,7 @@ class DocumentResponse(BaseModel):
     status: ProcessingStatus
     summary: str | None
     keywords: list[str]
+    sensitive_hits: list[dict]
     error_message: str | None
     chunk_count: int
     created_at: datetime

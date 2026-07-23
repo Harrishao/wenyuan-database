@@ -42,7 +42,8 @@ export interface KnowledgeBase {
   updated_at: string;
 }
 
-export type ProcessingStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
+export type ProcessingStatus =
+  "pending" | "running" | "succeeded" | "failed" | "cancelled";
 
 export interface DocumentRecord {
   id: string;
@@ -53,6 +54,7 @@ export interface DocumentRecord {
   status: ProcessingStatus;
   summary: string | null;
   keywords: string[];
+  sensitive_hits: Array<Record<string, unknown>>;
   error_message: string | null;
   chunk_count: number;
   created_at: string;
@@ -80,7 +82,8 @@ export interface SearchResponse {
   results: SearchResult[];
 }
 
-export type ReportStatus = "draft" | "generating" | "ready" | "failed" | "archived";
+export type ReportStatus =
+  "draft" | "generating" | "ready" | "failed" | "archived";
 
 export interface ReportTemplateSection {
   key: string;
@@ -134,6 +137,7 @@ export interface ReportListItem {
 export interface ReportDetail extends ReportListItem {
   inputs: Record<string, string>;
   progress: number;
+  sensitive_hits: Array<Record<string, unknown>>;
   sections: ReportSection[];
 }
 
@@ -215,4 +219,118 @@ export interface AssistantAnswer {
   answer: string;
   model: string;
   evidence: AssistantEvidence[];
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  display_name: string;
+  role: "student" | "admin";
+  status: "active" | "disabled";
+  document_count: number;
+  report_count: number;
+  created_at: string;
+}
+
+export interface PromptMessage {
+  name: string;
+  role: "system" | "user" | "assistant";
+  content: string;
+  enabled: boolean;
+  position: number;
+}
+
+export interface PromptPreset {
+  id: string;
+  name: string;
+  description: string | null;
+  messages: PromptMessage[];
+  version: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LlmPreset {
+  id: string;
+  name: string;
+  base_url: string;
+  model: string;
+  parameters: Record<string, unknown>;
+  has_api_key: boolean;
+  version: number;
+  is_active: boolean;
+  bound_prompt_preset_id: string | null;
+  bound_embedding_preset_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmbeddingPreset {
+  id: string;
+  name: string;
+  provider: "local_hashing" | "openai_compatible";
+  base_url: string | null;
+  model: string;
+  dimensions: number;
+  parameters: Record<string, unknown>;
+  has_api_key: boolean;
+  version: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RuntimeConfig {
+  llm_preset_id: string | null;
+  prompt_preset_id: string | null;
+  embedding_preset_id: string | null;
+  source: "database" | "environment" | "offline";
+}
+
+export interface SensitiveTerm {
+  id: string;
+  term: string;
+  category: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SensitiveGroup {
+  name: string;
+  terms: string[];
+  enabled: boolean;
+  count: number;
+}
+
+export interface ServerStatus {
+  cpu_percent: number;
+  memory_percent: number;
+  memory_used_bytes: number;
+  memory_total_bytes: number;
+  process_rss_bytes: number;
+  uptime_seconds: number;
+  sampled_at: string;
+}
+
+export interface ApplicationLog {
+  timestamp: string;
+  level: string;
+  logger: string;
+  message: string;
+  request_id: string | null;
+}
+
+export interface AuditLog {
+  id: string;
+  actor_user_id: string | null;
+  actor_display_name: string | null;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  result: string;
+  details: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
 }

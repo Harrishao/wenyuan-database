@@ -5,8 +5,7 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.local_hashing_embedding import LocalHashingEmbedding
-from app.adapters.report_llm import LocalEvidenceDraftLlm, OpenAICompatibleLlm
+from app.adapters.report_llm import LocalEvidenceDraftLlm
 from app.core.config import get_settings
 from app.db.session import SessionFactory
 from app.domain.enums import ProcessingStatus, ReportStatus
@@ -22,26 +21,22 @@ from app.domain.models import (
     TemplateVersion,
 )
 from app.ports.llm import ChatMessage, ChatOptions
+from app.services.ai_config import (
+    get_active_prompt_preset,
+    get_runtime_embedding,
+    get_runtime_llm,
+    render_prompt_messages,
+)
+from app.services.sensitive_scan import scan_sensitive_text
 
 settings = get_settings()
-embedding = LocalHashingEmbedding(settings.embedding_dimensions)
 PROMPT_VERSION = "mvp2-v1"
-
-
-def get_report_llm() -> LocalEvidenceDraftLlm | OpenAICompatibleLlm:
-    if settings.llm_base_url and settings.llm_api_key and settings.llm_model:
-        return OpenAICompatibleLlm(
-            settings.llm_base_url,
-            settings.llm_api_key.get_secret_value(),
-            settings.llm_model,
-            settings.llm_timeout_seconds,
-        )
-    return LocalEvidenceDraftLlm()
 
 
 async def retrieve_evidence(
     session: AsyncSession, report: Report, query: str, top_k: int
 ) -> list[tuple[DocumentChunk, str, float]]:
+    embedding = await get_runtime_embedding(session)
     query_vector = await embedding.embed_query(query)
     distance = DocumentChunk.embedding.cosine_distance(query_vector)
     rows = (
@@ -53,14 +48,14 @@ async def retrieve_evidence(
                 Document.uploaded_by == report.owner_id,
                 Document.status == ProcessingStatus.SUCCEEDED,
                 DocumentChunk.embedding.is_not(None),
+                DocumentChunk.embedding_model == embedding.model_name,
             )
             .order_by(distance)
             .limit(top_k)
         )
     ).all()
     return [
-        (chunk, name, max(0.0, 1.0 - float(distance_value)))
-        for chunk, name, distance_value in rows
+        (chunk, name, max(0.0, 1.0 - float(distance_value))) for chunk, name, distance_value in rows
     ]
 
 
@@ -94,7 +89,6 @@ async def rebuild_version_markdown(session: AsyncSession, version: ReportVersion
 async def generate_report_sections(
     report_id: UUID, job_id: UUID, section_keys: list[str] | None = None
 ) -> None:
-    llm = get_report_llm()
     try:
         async with SessionFactory() as session:
             report = await session.get(Report, report_id)
@@ -121,6 +115,9 @@ async def generate_report_sections(
             job = await session.get(BackgroundJob, job_id)
             if version is None or template_version is None or job is None:
                 return
+            llm = await get_runtime_llm(session)
+            prompt_preset = await get_active_prompt_preset(session)
+            embedding = await get_runtime_embedding(session)
             inputs = version.generation_context.get("inputs", {})
             template_sections = (
                 await session.scalars(
@@ -181,11 +178,30 @@ async def generate_report_sections(
                     },
                     ensure_ascii=False,
                 )
+                fallback_messages = [
+                    ChatMessage(role="system", content=template_version.system_prompt),
+                    ChatMessage(role="user", content=prompt),
+                ]
+                messages = (
+                    fallback_messages
+                    if isinstance(llm, LocalEvidenceDraftLlm)
+                    else render_prompt_messages(
+                        prompt_preset,
+                        {
+                            "topic": topic,
+                            "research_goal": research_goal,
+                            "section_title": template_section.title,
+                            "section_instructions": template_section.instructions,
+                            "evidence": evidence_payload,
+                            "evidence_json": evidence_payload,
+                            "inputs": inputs,
+                            "user_input": prompt,
+                        },
+                        fallback_messages,
+                    )
+                )
                 content = await llm.chat(
-                    [
-                        ChatMessage(role="system", content=template_version.system_prompt),
-                        ChatMessage(role="user", content=prompt),
-                    ],
+                    messages,
                     ChatOptions(
                         temperature=0.2,
                         max_tokens=1200,
@@ -227,12 +243,17 @@ async def generate_report_sections(
                     "model": llm.model_name,
                     "embedding_model": embedding.model_name,
                     "prompt_version": PROMPT_VERSION,
+                    "prompt_preset_id": str(prompt_preset.id) if prompt_preset else None,
+                    "prompt_preset_version": prompt_preset.version if prompt_preset else None,
                     "top_k": top_k,
                 }
                 context["retrieval"] = retrieval
                 version.generation_context = context
                 completed.append(template_section.key)
                 await rebuild_version_markdown(session, version)
+                version.sensitive_hits = await scan_sensitive_text(
+                    session, version.content_markdown
+                )
                 await session.commit()
 
             report.status = ReportStatus.READY

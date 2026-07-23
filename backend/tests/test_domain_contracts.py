@@ -19,9 +19,7 @@ def test_job_state_contract_is_stable() -> None:
 
 def test_document_deletion_preserves_citation_snapshots() -> None:
     chunk_reference = next(iter(Citation.__table__.c.document_chunk_id.foreign_keys))
-    similarity_reference = next(
-        iter(SimilarityMatch.__table__.c.document_chunk_id.foreign_keys)
-    )
+    similarity_reference = next(iter(SimilarityMatch.__table__.c.document_chunk_id.foreign_keys))
 
     assert Citation.__table__.c.document_chunk_id.nullable is True
     assert chunk_reference.ondelete == "SET NULL"
@@ -31,7 +29,5 @@ def test_document_deletion_preserves_citation_snapshots() -> None:
 
 
 def test_report_deletion_cascades_similarity_jobs() -> None:
-    report_version_reference = next(
-        iter(SimilarityJob.__table__.c.report_version_id.foreign_keys)
-    )
+    report_version_reference = next(iter(SimilarityJob.__table__.c.report_version_id.foreign_keys))
     assert report_version_reference.ondelete == "CASCADE"

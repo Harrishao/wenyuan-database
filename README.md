@@ -2,7 +2,7 @@
 
 大学生私有文献知识库、学术报告生成与私有语料相似度检测系统。
 
-当前仓库已完成 MVP 3：在私有知识库与报告生成闭环上，补齐可解释的私有语料相似度检测、定向润色版本和证据型学术助手。
+当前仓库已推进至 MVP 4：在私有知识库、报告生成和学术工具闭环上，补齐管理员治理、LLM/提示词/Embedding 预设、敏感词扫描与操作审计。
 
 MVP 1 使用透明可复现的本地字符 n-gram 哈希向量作为离线基线；后续可通过既有 Embedding 端口替换为 `BAAI/bge-small-zh-v1.5`，无需改动知识库业务流程。
 
@@ -33,6 +33,7 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install -e ".[dev]"
 Copy-Item ..\.env.example .env
 .venv\Scripts\alembic.exe upgrade head
+.venv\Scripts\python.exe scripts\set_admin_role.py --email admin@example.com
 .venv\Scripts\uvicorn.exe app.main:app --reload --port 4396
 ```
 
@@ -93,3 +94,26 @@ npm.cmd run api:generate
 - 只有用户确认润色后才建立新报告版本，原稿和历史版本不会被覆盖；
 - 提供“严谨导师”和“数据分析专家”角色，并区分普通对话与修改建议；
 - 学术助手先检索当前知识库，只返回能够映射到真实片段的引用编号。
+
+## MVP 4 功能
+
+- 管理员角色守卫、用户状态与用量管理；禁用用户后撤销刷新令牌；
+- LLM 连接参数、加密 API Key、任意附加请求参数、模型列表拉取和预设切换；
+- 可视化编排完整 `messages`，支持 system/user/assistant 角色、排序、停用、嵌套宏和提示词预设；
+- Embedding 支持本地哈希基线与 OpenAI 兼容第三方接口，允许不同维度的向量预设；
+- 切换 Embedding 后可为全部既有文献幂等重建向量，不混用不同模型或维度的历史向量；
+- LLM 预设可选绑定提示词或向量预设，切换时可同步，也可保持三者独立；
+- 管理员仪表盘可快速切换三类运行预设，并以折线图监控 CPU、内存和应用日志；
+- 三类预设统一使用下拉选择、新建、删除、放弃修改和同名覆盖二次确认交互；
+- 敏感词按组维护，支持组名、逗号分隔词项、独立启停、重命名和删除；
+- 文献与报告敏感词扫描结果，以及管理员关键操作审计；
+- 管理模板新版本的服务端接口，旧报告继续引用创建时的模板版本；
+- LLM 超时与网络失败重试、密钥只写与脱敏响应、MVP4 数据库迁移和自动化测试。
+
+启用 `backend/.env` 中的外部 LLM 后，可运行完整回归并将脱敏产物保留到指定目录：
+
+```powershell
+Set-Location backend
+.venv\Scripts\python.exe scripts\run_llm_mvp4_validation.py `
+  --artifacts ..\validation_artifacts\llm-enabled-mvp4-local
+```

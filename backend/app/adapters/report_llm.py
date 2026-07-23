@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from collections.abc import AsyncIterator
@@ -42,29 +43,44 @@ class OpenAICompatibleLlm:
         api_key: str,
         model: str,
         timeout_seconds: float = 300,
+        parameters: dict | None = None,
+        max_retries: int = 2,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model_name = model
         self.timeout_seconds = timeout_seconds
+        self.parameters = parameters or {}
+        self.max_retries = max_retries
 
     async def chat(self, messages: list[ChatMessage], options: ChatOptions) -> str:
-        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-            response = await client.post(
-                f"{self.base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                json={
-                    "model": self.model_name,
-                    "messages": [
-                        {"role": message.role, "content": message.content}
-                        for message in messages
-                    ],
-                    "temperature": options.temperature,
-                    "max_tokens": options.max_tokens,
-                },
-            )
-        response.raise_for_status()
-        return str(response.json()["choices"][0]["message"]["content"])
+        payload = {
+            **self.parameters,
+            "model": self.model_name,
+            "messages": [
+                {"role": message.role, "content": message.content} for message in messages
+            ],
+            "temperature": options.temperature,
+        }
+        if options.max_tokens is not None:
+            payload["max_tokens"] = options.max_tokens
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+                    response = await client.post(
+                        f"{self.base_url}/chat/completions",
+                        headers={"Authorization": f"Bearer {self.api_key}"},
+                        json=payload,
+                    )
+                response.raise_for_status()
+                return str(response.json()["choices"][0]["message"]["content"])
+            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                last_error = exc
+                if attempt >= self.max_retries:
+                    raise
+                await asyncio.sleep(0.5 * (2**attempt))
+        raise RuntimeError("LLM 请求失败") from last_error
 
     async def stream_chat(
         self, messages: list[ChatMessage], options: ChatOptions

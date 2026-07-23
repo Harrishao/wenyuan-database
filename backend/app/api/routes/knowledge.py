@@ -9,7 +9,6 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.adapters.local_file_storage import LocalFileStorage
-from app.adapters.local_hashing_embedding import LocalHashingEmbedding
 from app.api.dependencies import CurrentUser, SessionDep
 from app.core.config import get_settings
 from app.core.errors import AppError
@@ -26,12 +25,12 @@ from app.schemas.knowledge import (
     SearchResult,
     UploadResponse,
 )
+from app.services.ai_config import get_runtime_embedding
 from app.services.document_processing import process_document
 
 router = APIRouter()
 settings = get_settings()
 storage = LocalFileStorage(settings.storage_root)
-embedding = LocalHashingEmbedding(settings.embedding_dimensions)
 ALLOWED_TYPES: dict[str, tuple[str, set[str]]] = {
     ".pdf": ("application/pdf", {"application/pdf", "application/octet-stream"}),
     ".md": (
@@ -66,6 +65,7 @@ def document_response(document: Document, chunk_count: int = 0) -> DocumentRespo
         status=document.status,
         summary=document.summary,
         keywords=document.keywords,
+        sensitive_hits=document.sensitive_hits,
         error_message=document.error_message,
         chunk_count=chunk_count,
         created_at=document.created_at,
@@ -343,6 +343,7 @@ async def search_knowledge_base(
     current_user: CurrentUser,
 ) -> SearchResponse:
     await get_owned_knowledge_base(session, knowledge_base_id, current_user.id)
+    embedding = await get_runtime_embedding(session)
     query_vector = await embedding.embed_query(payload.query)
     distance = DocumentChunk.embedding.cosine_distance(query_vector)
     rows = (
@@ -354,6 +355,7 @@ async def search_knowledge_base(
                 Document.uploaded_by == current_user.id,
                 Document.status == ProcessingStatus.SUCCEEDED,
                 DocumentChunk.embedding.is_not(None),
+                DocumentChunk.embedding_model == embedding.model_name,
             )
             .order_by(distance)
             .limit(payload.top_k)
