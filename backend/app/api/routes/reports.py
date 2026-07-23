@@ -1,6 +1,8 @@
 import asyncio
 import json
+import re
 from collections.abc import AsyncIterator
+from decimal import Decimal
 from io import BytesIO
 from uuid import UUID
 
@@ -10,6 +12,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import CurrentUser, SessionDep
+from app.core.config import get_settings
 from app.core.errors import AppError
 from app.db.session import SessionFactory
 from app.domain.enums import ProcessingStatus, ReportStatus, TemplateStatus
@@ -23,11 +26,19 @@ from app.domain.models import (
     ReportSection,
     ReportTemplate,
     ReportVersion,
+    SimilarityJob,
+    SimilarityMatch,
     TemplateSection,
     TemplateVersion,
 )
 from app.schemas.report import (
+    AssistantEvidenceResponse,
+    AssistantRequest,
+    AssistantResponse,
     CitationResponse,
+    PolishAcceptRequest,
+    PolishPreviewRequest,
+    PolishPreviewResponse,
     ReportCreate,
     ReportCreateResponse,
     ReportDetail,
@@ -38,14 +49,24 @@ from app.schemas.report import (
     ReportTemplateResponse,
     ReportVersionResponse,
     SectionRetryRequest,
+    SimilarityJobResponse,
+    SimilarityMatchResponse,
+    SimilarityRunRequest,
     TemplateSectionResponse,
 )
+from app.services.academic_tools import answer_with_evidence, polish_text
 from app.services.docx_export import render_report_docx
-from app.services.report_generation import generate_report_sections, rebuild_version_markdown
+from app.services.report_generation import (
+    generate_report_sections,
+    rebuild_version_markdown,
+    retrieve_evidence,
+)
 from app.services.report_templates import ensure_builtin_templates
+from app.services.similarity import find_similarity_candidates
 
 templates_router = APIRouter()
 reports_router = APIRouter()
+settings = get_settings()
 
 
 async def get_owned_report(session: AsyncSession, report_id: UUID, owner_id: UUID) -> Report:
@@ -119,11 +140,9 @@ async def build_report_detail(session: AsyncSession, report: Report) -> ReportDe
     job = await get_latest_job(session, report)
     section_responses: list[ReportSectionResponse] = []
     for section in sections:
-        citation_rows = (
-            await session.execute(
-                select(Citation, DocumentChunk, Document.original_filename)
-                .join(DocumentChunk, DocumentChunk.id == Citation.document_chunk_id)
-                .join(Document, Document.id == DocumentChunk.document_id)
+        citations = (
+            await session.scalars(
+                select(Citation)
                 .where(Citation.report_section_id == section.id)
                 .order_by(Citation.marker)
             )
@@ -140,12 +159,12 @@ async def build_report_detail(session: AsyncSession, report: Report) -> ReportDe
                     CitationResponse(
                         id=citation.id,
                         marker=citation.marker,
-                        document_name=document_name,
-                        content=chunk.content,
-                        heading=chunk.heading,
-                        page_number=chunk.page_number,
+                        document_name=citation.document_name_snapshot,
+                        content=citation.content_snapshot,
+                        heading=citation.heading_snapshot,
+                        page_number=citation.page_number_snapshot,
                     )
-                    for citation, chunk, document_name in citation_rows
+                    for citation in citations
                 ],
             )
         )
@@ -201,20 +220,42 @@ async def snapshot_version(
         )
         session.add(new_section)
         await session.flush()
-        citations = (
+        citations = list(
             await session.scalars(
                 select(Citation).where(Citation.report_section_id == old_section.id)
             )
-        ).all()
+        )
+        citations_by_marker = {citation.marker: citation for citation in citations}
+        referenced_markers = set(re.findall(r"\[\d+\]", content))
+        missing_markers = referenced_markers - citations_by_marker.keys()
+        if missing_markers:
+            historical_citations = list(
+                await session.scalars(
+                    select(Citation)
+                    .join(ReportSection, ReportSection.id == Citation.report_section_id)
+                    .join(ReportVersion, ReportVersion.id == ReportSection.report_version_id)
+                    .where(
+                        ReportVersion.report_id == report.id,
+                        ReportSection.key == old_section.key,
+                        Citation.marker.in_(missing_markers),
+                    )
+                    .order_by(ReportVersion.version.desc())
+                )
+            )
+            for citation in historical_citations:
+                citations_by_marker.setdefault(citation.marker, citation)
         session.add_all(
             [
                 Citation(
                     report_section_id=new_section.id,
                     document_chunk_id=citation.document_chunk_id,
                     marker=citation.marker,
+                    document_name_snapshot=citation.document_name_snapshot,
+                    content_snapshot=citation.content_snapshot,
+                    heading_snapshot=citation.heading_snapshot,
+                    page_number_snapshot=citation.page_number_snapshot,
                 )
-                for citation in citations
-                if citation.marker in content
+                for citation in citations_by_marker.values()
             ]
         )
     report.current_version = new_version.version
@@ -617,4 +658,229 @@ async def stream_report_events(
         events(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@reports_router.post("/{report_id}/similarity", response_model=SimilarityJobResponse)
+async def run_report_similarity(
+    report_id: UUID,
+    payload: SimilarityRunRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> SimilarityJobResponse:
+    report = await get_owned_report(session, report_id, current_user.id)
+    version = await get_current_version(session, report)
+    threshold = (
+        payload.threshold if payload.threshold is not None else settings.similarity_threshold
+    )
+    chunk_rows = list(
+        (
+            await session.execute(
+                select(DocumentChunk, Document.original_filename)
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .where(
+                    Document.knowledge_base_id == report.knowledge_base_id,
+                    Document.uploaded_by == current_user.id,
+                    Document.status == ProcessingStatus.SUCCEEDED,
+                )
+                .order_by(Document.original_filename, DocumentChunk.position)
+            )
+        ).all()
+    )
+    parameters = {
+        "algorithm": "tfidf_char_cosine",
+        "threshold": threshold,
+        "ngram_range": [settings.similarity_ngram_min, settings.similarity_ngram_max],
+        "min_sentence_chars": settings.similarity_min_sentence_chars,
+    }
+    job = SimilarityJob(
+        owner_id=current_user.id,
+        report_version_id=version.id,
+        status=ProcessingStatus.RUNNING,
+        parameters=parameters,
+    )
+    session.add(job)
+    await session.flush()
+    candidates, ratio = find_similarity_candidates(
+        version.content_markdown,
+        [chunk.content for chunk, _ in chunk_rows],
+        threshold=threshold,
+        ngram_range=(settings.similarity_ngram_min, settings.similarity_ngram_max),
+        min_sentence_chars=settings.similarity_min_sentence_chars,
+    )
+    matches: list[SimilarityMatch] = []
+    for candidate in candidates:
+        chunk, _ = chunk_rows[candidate.candidate_index]
+        match = SimilarityMatch(
+            job_id=job.id,
+            document_chunk_id=chunk.id,
+            source_text=candidate.source.text,
+            matched_text=chunk.content,
+            score=Decimal(f"{candidate.score:.5f}"),
+            start_offset=candidate.source.start_offset,
+            end_offset=candidate.source.end_offset,
+        )
+        session.add(match)
+        matches.append(match)
+    job.overall_ratio = Decimal(f"{ratio:.5f}")
+    job.status = ProcessingStatus.SUCCEEDED
+    await session.commit()
+    for match in matches:
+        await session.refresh(match)
+    document_names = {chunk.id: name for chunk, name in chunk_rows}
+    chunks = {chunk.id: chunk for chunk, _ in chunk_rows}
+    return SimilarityJobResponse(
+        id=job.id,
+        report_version=version.version,
+        status=job.status,
+        overall_ratio=float(job.overall_ratio or 0),
+        parameters=parameters,
+        matches=[
+            SimilarityMatchResponse(
+                id=match.id,
+                document_chunk_id=match.document_chunk_id,
+                document_name=document_names[match.document_chunk_id],
+                heading=chunks[match.document_chunk_id].heading,
+                page_number=chunks[match.document_chunk_id].page_number,
+                source_text=match.source_text,
+                matched_text=match.matched_text,
+                score=float(match.score),
+                start_offset=match.start_offset,
+                end_offset=match.end_offset,
+            )
+            for match in matches
+        ],
+    )
+
+
+@reports_router.post("/{report_id}/polish", response_model=PolishPreviewResponse)
+async def preview_report_polish(
+    report_id: UUID,
+    payload: PolishPreviewRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> PolishPreviewResponse:
+    report = await get_owned_report(session, report_id, current_user.id)
+    version = await get_current_version(session, report)
+    section = await session.scalar(
+        select(ReportSection).where(
+            ReportSection.report_version_id == version.id,
+            ReportSection.key == payload.section_key,
+        )
+    )
+    if section is None:
+        raise AppError("REPORT_SECTION_NOT_FOUND", "报告章节不存在", status_code=404)
+    if payload.text not in section.content_markdown:
+        raise AppError(
+            "POLISH_SOURCE_STALE",
+            "待润色文字已不在当前章节中，请重新选择",
+            status_code=409,
+        )
+    polished, model = await polish_text(payload.text, payload.style)
+    return PolishPreviewResponse(
+        section_key=payload.section_key,
+        style=payload.style,
+        original_text=payload.text,
+        polished_text=polished,
+        model=model,
+    )
+
+
+@reports_router.post("/{report_id}/polish/accept", response_model=ReportDetail)
+async def accept_report_polish(
+    report_id: UUID,
+    payload: PolishAcceptRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> ReportDetail:
+    report = await get_owned_report(session, report_id, current_user.id)
+    version = await get_current_version(session, report)
+    section = await session.scalar(
+        select(ReportSection).where(
+            ReportSection.report_version_id == version.id,
+            ReportSection.key == payload.section_key,
+        )
+    )
+    if section is None:
+        raise AppError("REPORT_SECTION_NOT_FOUND", "报告章节不存在", status_code=404)
+    if payload.text not in section.content_markdown:
+        raise AppError(
+            "POLISH_SOURCE_STALE",
+            "原文已变化，润色结果未写入",
+            status_code=409,
+        )
+    replacement = section.content_markdown.replace(payload.text, payload.polished_text, 1)
+    await snapshot_version(
+        session,
+        report,
+        version,
+        f"polish_{payload.style}",
+        (section.key, replacement),
+    )
+    report.status = ReportStatus.READY
+    await session.commit()
+    await session.refresh(report)
+    return await build_report_detail(session, report)
+
+
+@reports_router.post("/{report_id}/assistant", response_model=AssistantResponse)
+async def ask_report_assistant(
+    report_id: UUID,
+    payload: AssistantRequest,
+    session: SessionDep,
+    current_user: CurrentUser,
+) -> AssistantResponse:
+    report = await get_owned_report(session, report_id, current_user.id)
+    version = await get_current_version(session, report)
+    context = version.content_markdown
+    if payload.section_key:
+        section = await session.scalar(
+            select(ReportSection).where(
+                ReportSection.report_version_id == version.id,
+                ReportSection.key == payload.section_key,
+            )
+        )
+        if section is None:
+            raise AppError("REPORT_SECTION_NOT_FOUND", "报告章节不存在", status_code=404)
+        context = section.content_markdown
+    evidence_rows = await retrieve_evidence(
+        session,
+        report,
+        f"{report.title} {payload.question} {context[:800]}",
+        4,
+    )
+    evidence_payload = [
+        {
+            "marker": index,
+            "document": document_name,
+            "heading": chunk.heading,
+            "page_number": chunk.page_number,
+            "content": chunk.content,
+            "similarity": similarity,
+        }
+        for index, (chunk, document_name, similarity) in enumerate(evidence_rows, start=1)
+    ]
+    answer, markers, model = await answer_with_evidence(
+        role=payload.role,
+        mode=payload.mode,
+        question=payload.question,
+        report_context=context,
+        evidence=evidence_payload,
+    )
+    return AssistantResponse(
+        role=payload.role,
+        mode=payload.mode,
+        answer=answer,
+        model=model,
+        evidence=[
+            AssistantEvidenceResponse(
+                marker=f"[{marker}]",
+                document_chunk_id=evidence_rows[marker - 1][0].id,
+                document_name=evidence_rows[marker - 1][1],
+                content=evidence_rows[marker - 1][0].content,
+                heading=evidence_rows[marker - 1][0].heading,
+                page_number=evidence_rows[marker - 1][0].page_number,
+            )
+            for marker in markers
+        ],
     )

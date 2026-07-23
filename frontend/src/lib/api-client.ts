@@ -1,9 +1,14 @@
 import type {
   ApiError,
+  AssistantAnswer,
+  AssistantMode,
+  AssistantRole,
   AuthResponse,
   DocumentRecord,
   HealthResponse,
   KnowledgeBase,
+  PolishPreview,
+  PolishStyle,
   ReportCreateResponse,
   ReportDetail,
   ReportEvent,
@@ -11,6 +16,7 @@ import type {
   ReportTemplate,
   ReportVersion,
   SearchResponse,
+  SimilarityResult,
   UploadResponse,
   User,
 } from "@/contracts/api";
@@ -170,6 +176,30 @@ export const api = {
     request<ReportDetail>(`/api/v1/reports/${reportId}/versions/${version}/restore`, {
       method: "POST",
     }),
+  runSimilarity: (reportId: string) =>
+    jsonRequest<SimilarityResult>(`/api/v1/reports/${reportId}/similarity`, "POST", {}),
+  previewPolish: (
+    reportId: string,
+    payload: { section_key: string; text: string; style: PolishStyle },
+  ) => jsonRequest<PolishPreview>(`/api/v1/reports/${reportId}/polish`, "POST", payload),
+  acceptPolish: (
+    reportId: string,
+    payload: {
+      section_key: string;
+      text: string;
+      polished_text: string;
+      style: PolishStyle;
+    },
+  ) => jsonRequest<ReportDetail>(`/api/v1/reports/${reportId}/polish/accept`, "POST", payload),
+  askAssistant: (
+    reportId: string,
+    payload: {
+      role: AssistantRole;
+      mode: AssistantMode;
+      question: string;
+      section_key?: string;
+    },
+  ) => jsonRequest<AssistantAnswer>(`/api/v1/reports/${reportId}/assistant`, "POST", payload),
   exportReport: async (reportId: string, title: string) => {
     const response = await authorizedFetch(`/api/v1/reports/${reportId}/export.docx`);
     const blob = await response.blob();

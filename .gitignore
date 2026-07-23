@@ -1,21 +1,41 @@
+# Environment variables and local secrets
 .env
+.env.*
+!.env.example
+
+# Python environments, caches, builds, and coverage
 .venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
+build/
 .pytest_cache/
 .ruff_cache/
-htmlcov/
+.mypy_cache/
 .coverage
+.coverage.*
+htmlcov/
 
-frontend/node_modules/
-frontend/dist/
+# Frontend dependencies and build output
+node_modules/
+/frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-backend/data/
-
-.idea/
-.vscode/
+# Runtime data and validation artifacts
+/backend/data/
+/validation_artifacts/
 *.log
 
-素材/
-*.md
-!README.md
+# Editors and operating-system metadata
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local-only project materials and credential-bearing notes
+/素材/
+/待办事项.md

@@ -34,6 +34,7 @@ def get_report_llm() -> LocalEvidenceDraftLlm | OpenAICompatibleLlm:
             settings.llm_base_url,
             settings.llm_api_key.get_secret_value(),
             settings.llm_model,
+            settings.llm_timeout_seconds,
         )
     return LocalEvidenceDraftLlm()
 
@@ -210,6 +211,10 @@ async def generate_report_sections(
                             report_section_id=section.id,
                             document_chunk_id=evidence[marker - 1][0].id,
                             marker=f"[{marker}]",
+                            document_name_snapshot=evidence[marker - 1][1],
+                            content_snapshot=evidence[marker - 1][0].content,
+                            heading_snapshot=evidence[marker - 1][0].heading,
+                            page_number_snapshot=evidence[marker - 1][0].page_number,
                         )
                         for marker in used_markers
                     ]
@@ -248,5 +253,5 @@ async def generate_report_sections(
                 report.status = ReportStatus.FAILED
             if job:
                 job.status = ProcessingStatus.FAILED
-                job.error_message = str(exc)[:1000]
+                job.error_message = (str(exc) or type(exc).__name__)[:1000]
             await session.commit()

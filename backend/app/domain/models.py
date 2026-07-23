@@ -260,7 +260,13 @@ class Citation(UuidPrimaryKeyMixin, Base):
     report_section_id: Mapped[UUID] = mapped_column(
         ForeignKey("report_sections.id", ondelete="CASCADE"), index=True
     )
-    document_chunk_id: Mapped[UUID] = mapped_column(ForeignKey("document_chunks.id"), index=True)
+    document_chunk_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("document_chunks.id", ondelete="SET NULL"), index=True
+    )
+    document_name_snapshot: Mapped[str] = mapped_column(String(255))
+    content_snapshot: Mapped[str] = mapped_column(Text)
+    heading_snapshot: Mapped[str | None] = mapped_column(String(500))
+    page_number_snapshot: Mapped[int | None] = mapped_column(Integer)
     marker: Mapped[str] = mapped_column(String(30))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -274,7 +280,9 @@ class SimilarityJob(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "similarity_jobs"
 
     owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
-    report_version_id: Mapped[UUID] = mapped_column(ForeignKey("report_versions.id"), index=True)
+    report_version_id: Mapped[UUID] = mapped_column(
+        ForeignKey("report_versions.id", ondelete="CASCADE"), index=True
+    )
     status: Mapped[ProcessingStatus] = mapped_column(
         Enum(
             ProcessingStatus,
@@ -294,7 +302,9 @@ class SimilarityMatch(UuidPrimaryKeyMixin, Base):
     job_id: Mapped[UUID] = mapped_column(
         ForeignKey("similarity_jobs.id", ondelete="CASCADE"), index=True
     )
-    document_chunk_id: Mapped[UUID] = mapped_column(ForeignKey("document_chunks.id"), index=True)
+    document_chunk_id: Mapped[UUID] = mapped_column(
+        ForeignKey("document_chunks.id", ondelete="CASCADE"), index=True
+    )
     source_text: Mapped[str] = mapped_column(Text)
     matched_text: Mapped[str] = mapped_column(Text)
     score: Mapped[Decimal] = mapped_column(Numeric(6, 5))

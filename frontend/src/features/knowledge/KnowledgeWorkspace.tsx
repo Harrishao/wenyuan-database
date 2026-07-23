@@ -2,7 +2,9 @@ import { FormEvent, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   FileSearch,
   FileText,
   LogOut,
@@ -91,6 +93,7 @@ export function KnowledgeWorkspace({ onOpenReports }: { onOpenReports: () => voi
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [documentsExpanded, setDocumentsExpanded] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [filter, setFilter] = useState("");
@@ -255,6 +258,7 @@ export function KnowledgeWorkspace({ onOpenReports }: { onOpenReports: () => voi
                   onClick={() => {
                     setSelectedId(item.id);
                     setSearchResult(null);
+                    setDocumentsExpanded(false);
                   }}
                   type="button"
                 >
@@ -330,28 +334,41 @@ export function KnowledgeWorkspace({ onOpenReports }: { onOpenReports: () => voi
               </div>
             )}
 
-            <div
-              className="mt-5 space-y-2"
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                acceptFiles(event.dataTransfer.files);
-              }}
-            >
-              {documents.data?.map((document, index) => (
-                <DocumentRow
-                  document={document}
-                  index={index}
-                  key={document.id}
-                  onDelete={() => deleteDocument.mutate(document.id)}
-                  onRetry={() => retryDocument.mutate(document.id)}
-                />
-              ))}
-              {selected && !documents.isLoading && !documents.data?.length && (
-                <button className="upload-field" onClick={() => fileInput.current?.click()} type="button">
-                  <FileText className="h-6 w-6" />
-                  <span className="font-medium">把第一篇文献放入档案</span>
-                  <span className="text-xs text-slate-400">支持 PDF、Markdown、TXT，单文件不超过 20 MB</span>
+            <div className={`document-list-shell ${documentsExpanded ? "expanded" : ""}`}>
+              <div
+                className="document-list-viewport mt-5 space-y-2"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  acceptFiles(event.dataTransfer.files);
+                }}
+              >
+                {documents.data?.map((document, index) => (
+                  <DocumentRow
+                    document={document}
+                    index={index}
+                    key={document.id}
+                    onDelete={() => deleteDocument.mutate(document.id)}
+                    onRetry={() => retryDocument.mutate(document.id)}
+                  />
+                ))}
+                {selected && !documents.isLoading && !documents.data?.length && (
+                  <button className="upload-field" onClick={() => fileInput.current?.click()} type="button">
+                    <FileText className="h-6 w-6" />
+                    <span className="font-medium">把第一篇文献放入档案</span>
+                    <span className="text-xs text-slate-400">支持 PDF、Markdown、TXT，单文件不超过 20 MB</span>
+                  </button>
+                )}
+              </div>
+              {(documents.data?.length ?? 0) > 3 && !documentsExpanded && (
+                <button className="document-list-expand" onClick={() => setDocumentsExpanded(true)} type="button">
+                  <ChevronDown className="h-4 w-4" />
+                  <span>展开全部 {documents.data?.length} 篇文献</span>
+                </button>
+              )}
+              {(documents.data?.length ?? 0) > 3 && documentsExpanded && (
+                <button className="document-list-collapse" onClick={() => setDocumentsExpanded(false)} type="button">
+                  <ChevronUp className="h-4 w-4" />收起文献列表
                 </button>
               )}
             </div>

@@ -289,7 +289,15 @@ async def delete_document(
         raise AppError("DOCUMENT_NOT_FOUND", "文献不存在", status_code=404)
     storage_key = document.storage_key
     await session.delete(document)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise AppError(
+            "DOCUMENT_DELETE_CONFLICT",
+            "文献仍被其他业务数据引用，暂时无法删除",
+            status_code=409,
+        ) from exc
     await storage.delete(storage_key)
 
 

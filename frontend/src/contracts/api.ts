@@ -159,3 +159,60 @@ export interface ReportEvent {
   completed_sections: string[];
   error_message: string | null;
 }
+
+export type PolishStyle = "academic" | "plain" | "concise";
+export type AssistantRole = "rigorous_mentor" | "data_analyst";
+export type AssistantMode = "dialogue" | "revision";
+
+export interface SimilarityMatch {
+  id: string;
+  document_chunk_id: string;
+  document_name: string;
+  heading: string | null;
+  page_number: number | null;
+  source_text: string;
+  matched_text: string;
+  score: number;
+  start_offset: number;
+  end_offset: number;
+}
+
+export interface SimilarityResult {
+  id: string;
+  report_version: number;
+  status: ProcessingStatus;
+  overall_ratio: number;
+  metric_label: string;
+  parameters: {
+    algorithm: string;
+    threshold: number;
+    ngram_range: [number, number];
+    min_sentence_chars: number;
+  };
+  matches: SimilarityMatch[];
+}
+
+export interface PolishPreview {
+  section_key: string;
+  style: PolishStyle;
+  original_text: string;
+  polished_text: string;
+  model: string;
+}
+
+export interface AssistantEvidence {
+  marker: string;
+  document_chunk_id: string;
+  document_name: string;
+  content: string;
+  heading: string | null;
+  page_number: number | null;
+}
+
+export interface AssistantAnswer {
+  role: AssistantRole;
+  mode: AssistantMode;
+  answer: string;
+  model: string;
+  evidence: AssistantEvidence[];
+}

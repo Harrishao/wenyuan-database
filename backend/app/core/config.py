@@ -34,8 +34,13 @@ class Settings(BaseSettings):
     llm_base_url: str | None = None
     llm_api_key: SecretStr | None = None
     llm_model: str | None = None
+    llm_timeout_seconds: float = Field(default=300, gt=0, le=900)
     embedding_model: str = "BAAI/bge-small-zh-v1.5"
     embedding_dimensions: int = Field(default=512, gt=0, le=16_000)
+    similarity_threshold: float = Field(default=0.10, ge=0.0, le=1.0)
+    similarity_ngram_min: int = Field(default=2, ge=1, le=8)
+    similarity_ngram_max: int = Field(default=4, ge=1, le=8)
+    similarity_min_sentence_chars: int = Field(default=12, ge=1, le=500)
 
     @field_validator("api_prefix")
     @classmethod
@@ -48,6 +53,8 @@ class Settings(BaseSettings):
     def validate_production_secrets(self) -> "Settings":
         if self.chunk_overlap_chars >= self.chunk_target_chars:
             raise ValueError("CHUNK_OVERLAP_CHARS 必须小于 CHUNK_TARGET_CHARS")
+        if self.similarity_ngram_min > self.similarity_ngram_max:
+            raise ValueError("SIMILARITY_NGRAM_MIN 不能大于 SIMILARITY_NGRAM_MAX")
         if (
             self.app_env == "production"
             and self.jwt_secret.get_secret_value()

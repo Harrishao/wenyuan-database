@@ -400,10 +400,133 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/{report_id}/similarity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Report Similarity */
+        post: operations["run_report_similarity_api_v1_reports__report_id__similarity_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{report_id}/polish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Report Polish */
+        post: operations["preview_report_polish_api_v1_reports__report_id__polish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{report_id}/polish/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Report Polish */
+        post: operations["accept_report_polish_api_v1_reports__report_id__polish_accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{report_id}/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask Report Assistant */
+        post: operations["ask_report_assistant_api_v1_reports__report_id__assistant_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AssistantEvidenceResponse */
+        AssistantEvidenceResponse: {
+            /** Marker */
+            marker: string;
+            /**
+             * Document Chunk Id
+             * Format: uuid
+             */
+            document_chunk_id: string;
+            /** Document Name */
+            document_name: string;
+            /** Content */
+            content: string;
+            /** Heading */
+            heading: string | null;
+            /** Page Number */
+            page_number: number | null;
+        };
+        /** AssistantRequest */
+        AssistantRequest: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "rigorous_mentor" | "data_analyst";
+            /**
+             * Mode
+             * @default dialogue
+             * @enum {string}
+             */
+            mode: "dialogue" | "revision";
+            /** Question */
+            question: string;
+            /** Section Key */
+            section_key?: string | null;
+        };
+        /** AssistantResponse */
+        AssistantResponse: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "rigorous_mentor" | "data_analyst";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "dialogue" | "revision";
+            /** Answer */
+            answer: string;
+            /** Model */
+            model: string;
+            /** Evidence */
+            evidence: components["schemas"]["AssistantEvidenceResponse"][];
+        };
         /** AuthResponse */
         AuthResponse: {
             /** Access Token */
@@ -579,6 +702,48 @@ export interface components {
             email: string;
             /** Password */
             password: string;
+        };
+        /** PolishAcceptRequest */
+        PolishAcceptRequest: {
+            /** Section Key */
+            section_key: string;
+            /** Text */
+            text: string;
+            /**
+             * Style
+             * @enum {string}
+             */
+            style: "academic" | "plain" | "concise";
+            /** Polished Text */
+            polished_text: string;
+        };
+        /** PolishPreviewRequest */
+        PolishPreviewRequest: {
+            /** Section Key */
+            section_key: string;
+            /** Text */
+            text: string;
+            /**
+             * Style
+             * @enum {string}
+             */
+            style: "academic" | "plain" | "concise";
+        };
+        /** PolishPreviewResponse */
+        PolishPreviewResponse: {
+            /** Section Key */
+            section_key: string;
+            /**
+             * Style
+             * @enum {string}
+             */
+            style: "academic" | "plain" | "concise";
+            /** Original Text */
+            original_text: string;
+            /** Polished Text */
+            polished_text: string;
+            /** Model */
+            model: string;
         };
         /**
          * ProcessingStatus
@@ -806,6 +971,64 @@ export interface components {
              * @default generation_retry
              */
             reason: string;
+        };
+        /** SimilarityJobResponse */
+        SimilarityJobResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Report Version */
+            report_version: number;
+            status: components["schemas"]["ProcessingStatus"];
+            /** Overall Ratio */
+            overall_ratio: number;
+            /**
+             * Metric Label
+             * @default 高相似文本占比
+             */
+            metric_label: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Matches */
+            matches: components["schemas"]["SimilarityMatchResponse"][];
+        };
+        /** SimilarityMatchResponse */
+        SimilarityMatchResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Document Chunk Id
+             * Format: uuid
+             */
+            document_chunk_id: string;
+            /** Document Name */
+            document_name: string;
+            /** Heading */
+            heading: string | null;
+            /** Page Number */
+            page_number: number | null;
+            /** Source Text */
+            source_text: string;
+            /** Matched Text */
+            matched_text: string;
+            /** Score */
+            score: number;
+            /** Start Offset */
+            start_offset: number;
+            /** End Offset */
+            end_offset: number;
+        };
+        /** SimilarityRunRequest */
+        SimilarityRunRequest: {
+            /** Threshold */
+            threshold?: number | null;
         };
         /** TemplateSectionResponse */
         TemplateSectionResponse: {
@@ -1710,6 +1933,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_report_similarity_api_v1_reports__report_id__similarity_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SimilarityRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimilarityJobResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_report_polish_api_v1_reports__report_id__polish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolishPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolishPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_report_polish_api_v1_reports__report_id__polish_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolishAcceptRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ask_report_assistant_api_v1_reports__report_id__assistant_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistantResponse"];
                 };
             };
             /** @description Validation Error */

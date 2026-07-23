@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -109,3 +110,77 @@ class ReportInputValidation(BaseModel):
         if missing:
             raise ValueError(f"缺少必填字段：{', '.join(missing)}")
         return self
+
+
+PolishStyle = Literal["academic", "plain", "concise"]
+AssistantRole = Literal["rigorous_mentor", "data_analyst"]
+AssistantMode = Literal["dialogue", "revision"]
+
+
+class SimilarityRunRequest(BaseModel):
+    threshold: float | None = Field(default=None, ge=0, le=1)
+
+
+class SimilarityMatchResponse(BaseModel):
+    id: UUID
+    document_chunk_id: UUID
+    document_name: str
+    heading: str | None
+    page_number: int | None
+    source_text: str
+    matched_text: str
+    score: float
+    start_offset: int
+    end_offset: int
+
+
+class SimilarityJobResponse(BaseModel):
+    id: UUID
+    report_version: int
+    status: ProcessingStatus
+    overall_ratio: float
+    metric_label: str = "高相似文本占比"
+    parameters: dict
+    matches: list[SimilarityMatchResponse]
+
+
+class PolishPreviewRequest(BaseModel):
+    section_key: str = Field(min_length=1, max_length=80)
+    text: str = Field(min_length=2, max_length=20_000)
+    style: PolishStyle
+
+
+class PolishPreviewResponse(BaseModel):
+    section_key: str
+    style: PolishStyle
+    original_text: str
+    polished_text: str
+    model: str
+
+
+class PolishAcceptRequest(PolishPreviewRequest):
+    polished_text: str = Field(min_length=1, max_length=20_000)
+
+
+class AssistantRequest(BaseModel):
+    role: AssistantRole
+    mode: AssistantMode = "dialogue"
+    question: str = Field(min_length=2, max_length=4_000)
+    section_key: str | None = Field(default=None, max_length=80)
+
+
+class AssistantEvidenceResponse(BaseModel):
+    marker: str
+    document_chunk_id: UUID
+    document_name: str
+    content: str
+    heading: str | None
+    page_number: int | None
+
+
+class AssistantResponse(BaseModel):
+    role: AssistantRole
+    mode: AssistantMode
+    answer: str
+    model: str
+    evidence: list[AssistantEvidenceResponse]
