@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
@@ -142,6 +142,41 @@ export function KnowledgeWorkspace({
         : false,
   });
 
+  const dynamicSearchPlaceholders = useMemo(() => {
+    if (!selected) return ["请先选择知识库"];
+    const list: string[] = [
+      `例如：概括“${selected.name}”中最重要的方法与结论`,
+    ];
+    if (documents.data?.length) {
+      documents.data.forEach((doc) => {
+        list.push(`例如：检索《${doc.original_filename}》的核心证据与结果`);
+        if (doc.keywords?.length) {
+          list.push(`例如：查找关于“${doc.keywords[0]}”的概念与讨论`);
+        }
+        if (doc.author) {
+          list.push(`例如：${doc.author} 在文献中提出了哪些研究方法？`);
+        }
+      });
+    }
+    return list;
+  }, [selected, documents.data]);
+
+  const [searchPlaceholderIndex, setSearchPlaceholderIndex] = useState(0);
+
+  useEffect(() => {
+    setSearchPlaceholderIndex(0);
+  }, [selected?.id]);
+
+  useEffect(() => {
+    if (dynamicSearchPlaceholders.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setSearchPlaceholderIndex(
+        (prev) => (prev + 1) % dynamicSearchPlaceholders.length,
+      );
+    }, 2800);
+    return () => window.clearInterval(timer);
+  }, [dynamicSearchPlaceholders]);
+
   const createKnowledgeBase = useMutation({
     mutationFn: api.createKnowledgeBase,
     onSuccess: async (item) => {
@@ -160,6 +195,19 @@ export function KnowledgeWorkspace({
       await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
       setIsEditing(false);
       setNotice("知识库信息已保存");
+    },
+    onError: (error) => setNotice(errorText(error)),
+  });
+  const deleteKnowledgeBase = useMutation({
+    mutationFn: (id: string) => api.deleteKnowledgeBase(id),
+    onSuccess: async (_, deletedId) => {
+      setNotice("知识库已删除");
+      await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+      if (selectedId === deletedId) {
+        const remaining = knowledgeBases.data?.filter((item) => item.id !== deletedId);
+        setSelectedId(remaining?.[0]?.id ?? "");
+        setSearchResult(null);
+      }
     },
     onError: (error) => setNotice(errorText(error)),
   });
@@ -346,9 +394,26 @@ export function KnowledgeWorkspace({
                   type="button"
                 >
                   <span className="font-mono text-[10px] text-slate-400">KB-{String(index + 1).padStart(2, "0")}</span>
-                  <span className="mt-1 block truncate font-medium">{item.name}</span>
+                  <span className="mt-1 block truncate font-medium pr-6">{item.name}</span>
                   <span className="mt-2 block text-xs text-slate-400">{item.document_count} 篇文献</span>
-                  <ChevronRight className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 opacity-40" />
+                  <button
+                    className="library-spine-delete"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (
+                        window.confirm(
+                          `确定要删除知识库“${item.name}”吗？此操作将永久删除该知识库及其关联的所有文献与切片！`,
+                        )
+                      ) {
+                        deleteKnowledgeBase.mutate(item.id);
+                      }
+                    }}
+                    title="删除知识库"
+                    type="button"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <ChevronRight className="absolute right-3 bottom-3 h-4 w-4 opacity-40" />
                 </button>
               ))}
               {!knowledgeBases.isLoading && !knowledgeBases.data?.length && (
@@ -463,7 +528,7 @@ export function KnowledgeWorkspace({
             <h2 className="mt-2 font-serif text-2xl font-semibold">询问你的资料</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">检索结果只来自当前知识库，并保留文件名、标题和页码。</p>
             <form className="mt-6" onSubmit={submitSearch}>
-              <textarea className="search-box" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} disabled={!selected} placeholder={selected ? `例如：概括“${selected.name}”中最重要的方法与结论` : "请先选择知识库"} />
+              <textarea className="search-box" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} disabled={!selected} placeholder={dynamicSearchPlaceholders[searchPlaceholderIndex]} />
               <button className="primary-action mt-3 w-full" disabled={!selected || search.isPending || searchQuery.trim().length < 2} type="submit">
                 <FileSearch className="h-4 w-4" />{search.isPending ? "正在检索" : "检索相关片段"}
               </button>

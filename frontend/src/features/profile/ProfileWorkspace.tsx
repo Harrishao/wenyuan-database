@@ -231,8 +231,9 @@ export function ProfileWorkspace({ onBack }: { onBack: () => void }) {
                 value={theme}
                 onChange={(event) => setTheme(event.target.value)}
               >
-                <option value="light">浅色</option>
-                <option value="dark">深色</option>
+                <option value="light">浅色 (学府青灰 · 典雅严谨)</option>
+                <option value="warm">温馨 (暖阁纸香 · 柔和舒适)</option>
+                <option value="dark">深色 (夜读墨蓝 · 沉浸护眼)</option>
               </select>
             </label>
             <div className="grid grid-cols-2 gap-3">

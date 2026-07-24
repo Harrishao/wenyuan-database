@@ -1,15 +1,35 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { BookOpen, LockKeyhole } from "lucide-react";
 
 import { useAuthStore } from "@/features/auth/auth-store";
 import { ApiClientError, api } from "@/lib/api-client";
 
+const displayNameExamples = [
+  "尊贵的研究员",
+  "峡谷召唤师",
+  "沃尔玛塑料袋",
+  "愤怒的迪克",
+  "夜读学术星",
+  "猫娘学院高材生",
+  "图灵教派信徒",
+  "冯诺依曼教派信徒",
+  "量子力学幽灵",
+  "武装直升机",
+  "大魔导师",
+];
+
 export function AuthPage() {
-  const displayNameExamples = ["林同学", "课题组成员", "机械工程研究者"];
-  const displayNameExample =
-    displayNameExamples[new Date().getDate() % displayNameExamples.length];
+  const [exampleIndex, setExampleIndex] = useState(0);
   const [mode, setMode] = useState<"login" | "register" | "recover">("login");
   const [displayName, setDisplayName] = useState("");
+
+  useEffect(() => {
+    if (mode !== "register") return;
+    const timer = window.setInterval(() => {
+      setExampleIndex((prev) => (prev + 1) % displayNameExamples.length);
+    }, 2200);
+    return () => window.clearInterval(timer);
+  }, [mode]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -106,7 +126,7 @@ export function AuthPage() {
                     minLength={2}
                     maxLength={80}
                     required
-                    placeholder={`例如：${displayNameExample}`}
+                    placeholder={`例如：${displayNameExamples[exampleIndex]}`}
                   />
                 </label>
               )}

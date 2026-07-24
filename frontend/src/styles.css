@@ -1957,6 +1957,31 @@ textarea:focus-visible {
   border-left-color: #0891a2;
 }
 
+.library-spine-delete {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 4px;
+  color: #889ba2;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  z-index: 10;
+}
+
+.library-spine:hover .library-spine-delete {
+  opacity: 1;
+}
+
+.library-spine-delete:hover {
+  color: #dc2626;
+  background-color: rgba(220, 38, 38, 0.12);
+}
+
 .document-spine {
   display: flex;
   min-height: 124px;
@@ -3138,14 +3163,180 @@ textarea:focus-visible {
   padding: 9px 12px;
 }
 
-html[data-theme="dark"] body,
-html[data-theme="dark"] main {
-  background: #10242c !important;
+/* ==========================================================================
+   多主题体系：学府青灰 (light) / 夜读墨蓝 (dark) / 暖阁纸香 (warm)
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   夜读墨蓝 (Dark Theme) - 沉浸护眼学术风格
+   -------------------------------------------------------------------------- */
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
-html[data-theme="dark"] main > div {
-  border-color: #39535d !important;
-  filter: brightness(0.82) contrast(1.08);
+html[data-theme="dark"] body,
+html[data-theme="dark"] main {
+  background-color: #0b171d !important;
+  color: #d1e2e8 !important;
+}
+
+html[data-theme="dark"] main > div,
+html[data-theme="dark"] .mvp5-shell {
+  background-color: #12222a !important;
+  border-color: #233e4a !important;
+  color: #d5e5ea !important;
+  filter: none !important;
+}
+
+html[data-theme="dark"] header {
+  background-color: #162b35 !important;
+  border-color: #244352 !important;
+  color: #e5f2f7 !important;
+}
+
+html[data-theme="dark"] aside {
+  background-color: #0e1c24 !important;
+  border-color: #223c4a !important;
+}
+
+html[data-theme="dark"] .library-spine {
+  color: #8da9b5 !important;
+}
+
+html[data-theme="dark"] .library-spine:hover,
+html[data-theme="dark"] .library-spine.active {
+  background-color: #1a3543 !important;
+  color: #38bdf8 !important;
+}
+
+html[data-theme="dark"] .library-spine.active {
+  border-left-color: #38bdf8 !important;
+}
+
+html[data-theme="dark"] .document-spine,
+html[data-theme="dark"] .report-card,
+html[data-theme="dark"] .mvp5-cards article,
+html[data-theme="dark"] .mvp5-form,
+html[data-theme="dark"] .dashboard-card {
+  background-color: #162a34 !important;
+  border-color: #254453 !important;
+  color: #d8e8ed !important;
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] select {
+  background-color: #0d1b22 !important;
+  border-color: #284a5a !important;
+  color: #ecf5f8 !important;
+}
+
+html[data-theme="dark"] .quiet-action {
+  color: #8faab6 !important;
+}
+
+html[data-theme="dark"] .quiet-action:hover {
+  background-color: #1b3644 !important;
+  color: #e0f2fe !important;
+}
+
+html[data-theme="dark"] .app-toast {
+  background-color: #16303d !important;
+  border-color: #2b5368 !important;
+  color: #bae6fd !important;
+}
+
+html[data-theme="dark"] .editor-workspace-sheet,
+html[data-theme="dark"] .report-empty-state {
+  background-color: #14252e !important;
+  border-color: #254453 !important;
+  color: #d1e2e8 !important;
+}
+
+/* --------------------------------------------------------------------------
+   暖阁纸香 (Warm Theme) - 柔和舒适学术风格
+   -------------------------------------------------------------------------- */
+html[data-theme="warm"] {
+  color-scheme: light;
+}
+
+html[data-theme="warm"] body,
+html[data-theme="warm"] main {
+  background-color: #eddcc4 !important;
+  color: #3b2a1a !important;
+}
+
+html[data-theme="warm"] main > div,
+html[data-theme="warm"] .mvp5-shell {
+  background-color: #f7f1e5 !important;
+  border-color: #d6be9c !important;
+  color: #3b2a1a !important;
+  filter: none !important;
+}
+
+html[data-theme="warm"] header {
+  background-color: #eee0cb !important;
+  border-color: #d4bc9a !important;
+  color: #2a1c0f !important;
+}
+
+html[data-theme="warm"] aside {
+  background-color: #e6d3ba !important;
+  border-color: #d4bc9a !important;
+}
+
+html[data-theme="warm"] .library-spine {
+  color: #5c4633 !important;
+}
+
+html[data-theme="warm"] .library-spine:hover,
+html[data-theme="warm"] .library-spine.active {
+  background-color: #ded0b8 !important;
+  color: #7c2d12 !important;
+}
+
+html[data-theme="warm"] .library-spine.active {
+  border-left-color: #c2410c !important;
+}
+
+html[data-theme="warm"] .document-spine,
+html[data-theme="warm"] .report-card,
+html[data-theme="warm"] .mvp5-cards article,
+html[data-theme="warm"] .mvp5-form,
+html[data-theme="warm"] .dashboard-card {
+  background-color: #fcf9f2 !important;
+  border-color: #d8c3a5 !important;
+  color: #3b2a1a !important;
+}
+
+html[data-theme="warm"] input,
+html[data-theme="warm"] textarea,
+html[data-theme="warm"] select {
+  background-color: #f5ece0 !important;
+  border-color: #d4bd9b !important;
+  color: #2a1c0f !important;
+}
+
+html[data-theme="warm"] .quiet-action {
+  color: #634b36 !important;
+}
+
+html[data-theme="warm"] .quiet-action:hover {
+  background-color: #e0d0b8 !important;
+  color: #431407 !important;
+}
+
+html[data-theme="warm"] .app-toast {
+  background-color: #fef3c7 !important;
+  border-color: #fde68a !important;
+  color: #78350f !important;
+}
+
+html[data-theme="warm"] .editor-workspace-sheet,
+html[data-theme="warm"] .report-empty-state {
+  background-color: #fcf8f0 !important;
+  border-color: #d8c3a5 !important;
+  color: #3b2a1a !important;
 }
 
 @media (max-width: 800px) {
