@@ -473,6 +473,12 @@ async def update_prompt_capability(
     item = await session.get(PromptCapability, capability_key)
     if item is None:
         raise AppError("PROMPT_CAPABILITY_NOT_FOUND", "功能不存在", status_code=404)
+    if item.is_system:
+        raise AppError(
+            "PROMPT_CAPABILITY_IS_SYSTEM",
+            "报告生成、普通对话和局部润色为系统功能，不能改名",
+            status_code=409,
+        )
     item.name = payload.name.strip()
     try:
         add_audit(
@@ -605,7 +611,7 @@ async def delete_prompt_preset(
     if item is None:
         raise AppError("PROMPT_PRESET_NOT_FOUND", "提示词预设不存在", status_code=404)
     if item.is_active:
-        raise AppError("PRESET_IS_ACTIVE", "请先切换到其他提示词预设", status_code=409)
+        raise AppError("PRESET_IS_ACTIVE", "请先取消勾选该提示词预设", status_code=409)
     add_audit(session, admin, request, "prompt_preset.delete", "prompt_preset", item.id)
     await session.delete(item)
     await session.commit()
@@ -625,10 +631,7 @@ async def set_prompt_enabled(
     item = await session.get(PromptPreset, preset_id)
     if item is None:
         raise AppError("PROMPT_PRESET_NOT_FOUND", "提示词预设不存在", status_code=404)
-    if payload.enabled:
-        await activate_prompt_preset(session, item.id)
-    else:
-        item.is_active = False
+    item.is_active = payload.enabled
     add_audit(
         session,
         admin,

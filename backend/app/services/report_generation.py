@@ -14,6 +14,7 @@ from app.domain.models import (
     Citation,
     Document,
     DocumentChunk,
+    PromptPreset,
     Report,
     ReportSection,
     ReportVersion,
@@ -119,6 +120,16 @@ async def generate_report_sections(
                 return
             llm = await get_runtime_llm(session)
             prompt_preset = await get_prompt_profile(session, "report_generation", "default")
+            if prompt_preset is None:
+                prompt_preset = await session.scalar(
+                    select(PromptPreset)
+                    .where(
+                        PromptPreset.capability == "report_generation",
+                        PromptPreset.is_active.is_(True),
+                    )
+                    .order_by(PromptPreset.version.desc())
+                    .limit(1)
+                )
             embedding = await get_runtime_embedding(session)
             inputs = version.generation_context.get("inputs", {})
             template_sections = (

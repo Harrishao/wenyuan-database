@@ -3,7 +3,8 @@ from decimal import Decimal
 from app.adapters.report_llm import parse_usage
 from app.domain.models import User
 from app.ports.llm import ChatMessage
-from app.schemas.admin import LlmPresetInput
+from app.schemas.admin import LlmPresetInput, PromptMessageInput, PromptPresetInput
+from app.schemas.report import ChatStreamRequest
 
 
 def test_student_defaults_have_storage_and_monthly_credits() -> None:
@@ -56,3 +57,26 @@ def test_channel_usage_is_preserved_without_estimation() -> None:
     assert usage.input_tokens == 120
     assert usage.output_tokens == 30
     assert usage.estimated is False
+
+
+def test_prompt_style_is_a_user_facing_label() -> None:
+    preset = PromptPresetInput(
+        name="学术导师预设",
+        capability="academic_assistant",
+        variant_key="严谨导师",
+        messages=[
+            PromptMessageInput(
+                name="系统消息",
+                role="system",
+                content="检查论证边界。",
+                position=0,
+            )
+        ],
+    )
+    request = ChatStreamRequest(
+        question="检查当前章节",
+        capability="academic_assistant",
+        variant_key=preset.variant_key,
+    )
+    assert preset.variant_key == "严谨导师"
+    assert request.variant_key == "严谨导师"

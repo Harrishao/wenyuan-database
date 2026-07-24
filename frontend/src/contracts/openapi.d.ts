@@ -1602,7 +1602,7 @@ export interface components {
             capability: string;
             /**
              * Variant Key
-             * @default rigorous_mentor
+             * @default 严谨导师
              */
             variant_key: string;
             /** Section Key */
@@ -2219,7 +2219,7 @@ export interface components {
             capability: string;
             /**
              * Variant Key
-             * @default default
+             * @default 默认风格
              */
             variant_key: string;
             /** Messages */
@@ -2238,7 +2238,7 @@ export interface components {
             capability: string;
             /**
              * Variant Key
-             * @default default
+             * @default 默认风格
              */
             variant_key: string;
             /** Messages */

@@ -13,6 +13,7 @@ import {
   KeyRound,
   LayoutTemplate,
   Megaphone,
+  Pencil,
   Plus,
   RefreshCw,
   Save,
@@ -89,7 +90,7 @@ const emptyPromptForm = {
   name: "",
   description: "",
   capability: "report_generation" as PromptPreset["capability"],
-  variant_key: "default",
+  variant_key: "默认风格",
   messages: [emptyPromptMessage(0)],
 };
 
@@ -156,7 +157,6 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
   const [llmForm, setLlmForm] = useState(emptyLlmForm);
   const [embeddingForm, setEmbeddingForm] = useState(emptyEmbeddingForm);
   const [promptForm, setPromptForm] = useState(emptyPromptForm);
-  const [capabilityForm, setCapabilityForm] = useState({ key: "", name: "" });
   const [activeMessageIndex, setActiveMessageIndex] = useState(0);
   const [models, setModels] = useState<string[]>([]);
   const [groupForm, setGroupForm] = useState({
@@ -255,9 +255,6 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
 
   const activeLlm = llms.data?.find(
     (item) => item.id === runtime.data?.llm_preset_id,
-  );
-  const activePrompt = prompts.data?.find(
-    (item) => item.id === runtime.data?.prompt_preset_id,
   );
   const activeEmbedding = embeddings.data?.find(
     (item) => item.id === runtime.data?.embedding_preset_id,
@@ -363,13 +360,27 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
 
   const savePrompt = useMutation({
     mutationFn: async () => {
+      const trimmedName = promptForm.name.trim();
+      const sameName = prompts.data?.find(
+        (item) => item.name === trimmedName && item.id !== selectedPromptId,
+      );
+      if (
+        sameName &&
+        !window.confirm(
+          `已存在名为“${sameName.name}”的提示词预设，是否确认覆盖？`,
+        )
+      ) {
+        throw new Error("SAVE_CANCELLED");
+      }
       const messages = promptForm.messages.map((message, position) => ({
         ...message,
         position,
       }));
-      return selectedPromptId
-        ? api.updatePromptPreset(selectedPromptId, { ...promptForm, messages })
-        : api.createPromptPreset({ ...promptForm, messages });
+      const payload = { ...promptForm, name: trimmedName, messages };
+      const targetId = sameName ? sameName.id : selectedPromptId;
+      return targetId
+        ? api.updatePromptPreset(targetId, payload)
+        : api.createPromptPreset(payload);
     },
     onSuccess: async (item) => {
       selectPrompt(item);
@@ -383,15 +394,22 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
   });
 
   const createCapability = useMutation({
-    mutationFn: () =>
-      api.createPromptCapability({
-        key: capabilityForm.key.trim(),
-        name: capabilityForm.name.trim(),
-      }),
+    mutationFn: api.createPromptCapability,
     onSuccess: async (item) => {
-      setCapabilityForm({ key: "", name: "" });
       setPromptForm((current) => ({ ...current, capability: item.key }));
       setNotice(`功能“${item.name}”已创建`);
+      await queryClient.invalidateQueries({
+        queryKey: ["admin-prompt-capabilities"],
+      });
+    },
+    onError: (error) => setNotice(errorText(error)),
+  });
+
+  const updateCapability = useMutation({
+    mutationFn: ({ key, name }: { key: string; name: string }) =>
+      api.updatePromptCapability(key, name),
+    onSuccess: async (item) => {
+      setNotice(`功能“${item.name}”已更新`);
       await queryClient.invalidateQueries({
         queryKey: ["admin-prompt-capabilities"],
       });
@@ -677,12 +695,10 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
             <Dashboard
               activeEmbedding={activeEmbedding}
               activeLlm={activeLlm}
-              activePrompt={activePrompt}
               embeddings={embeddings.data ?? []}
               llms={llms.data ?? []}
               logs={logs.data ?? []}
               logLevel={logLevel}
-              prompts={prompts.data ?? []}
               samples={telemetry}
               status={currentStatus}
               onEmbeddingChange={async (id) => {
@@ -694,10 +710,6 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
                 await refreshPresets();
               }}
               onLogLevelChange={setLogLevel}
-              onPromptChange={async (id) => {
-                await api.activatePromptPreset(id);
-                await refreshPresets();
-              }}
             />
           )}
 
@@ -1037,9 +1049,7 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
                               {item.variant_key}
                             </small>
                           </span>
-                          <span className="prompt-card-version">
-                            v{item.version}
-                          </span>
+
                           <button
                             className="prompt-card-delete"
                             onClick={(event) => {
@@ -1059,81 +1069,6 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
                     )}
                   </div>
 
-                  <div className="capability-manager">
-                    <div className="capability-manager-title">
-                      <span>功能管理</span>
-                      <small>三项系统功能不可删除</small>
-                    </div>
-                    <div className="capability-list">
-                      {promptCapabilities.data?.map((item) => (
-                        <div className="capability-row" key={item.key}>
-                          <span>
-                            <strong>{item.name}</strong>
-                            <small>{item.key}</small>
-                          </span>
-                          {item.is_system ? (
-                            <KeyRound aria-label="系统功能" />
-                          ) : (
-                            <button
-                              disabled={deleteCapability.isPending}
-                              onClick={() => {
-                                if (
-                                  window.confirm(
-                                    `删除功能“${item.name}”？有关联预设时不能删除。`,
-                                  )
-                                ) {
-                                  deleteCapability.mutate(item.key);
-                                }
-                              }}
-                              title="删除功能"
-                              type="button"
-                            >
-                              <Trash2 />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <form
-                      className="capability-create-form"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        createCapability.mutate();
-                      }}
-                    >
-                      <input
-                        maxLength={80}
-                        placeholder="功能名称"
-                        required
-                        value={capabilityForm.name}
-                        onChange={(event) =>
-                          setCapabilityForm({
-                            ...capabilityForm,
-                            name: event.target.value,
-                          })
-                        }
-                      />
-                      <input
-                        maxLength={40}
-                        pattern="[a-z][a-z0-9_]*"
-                        placeholder="function_key"
-                        required
-                        value={capabilityForm.key}
-                        onChange={(event) =>
-                          setCapabilityForm({
-                            ...capabilityForm,
-                            key: event.target.value,
-                          })
-                        }
-                      />
-                      <button
-                        disabled={createCapability.isPending}
-                        type="submit"
-                      >
-                        添加功能
-                      </button>
-                    </form>
-                  </div>
                 </aside>
 
                 <div className="prompt-editor">
@@ -1159,25 +1094,110 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
                       />
                     </Field>
                     <Field label="功能" halfWide>
-                      <select
-                        value={promptForm.capability}
-                        onChange={(event) =>
-                          setPromptForm({
-                            ...promptForm,
-                            capability: event.target.value,
-                          })
-                        }
-                      >
-                        {promptCapabilities.data?.map((item) => (
-                          <option key={item.key} value={item.key}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="capability-select-row">
+                        <select
+                          value={promptForm.capability}
+                          onChange={(event) =>
+                            setPromptForm({
+                              ...promptForm,
+                              capability: event.target.value,
+                            })
+                          }
+                        >
+                          {promptCapabilities.data?.map((item) => (
+                            <option key={item.key} value={item.key}>
+                              {item.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          disabled={createCapability.isPending}
+                          onClick={() => {
+                            const name = window.prompt("新功能名称");
+                            if (!name?.trim()) return;
+                            const key = window.prompt(
+                              "功能键（小写字母、数字和下划线）",
+                            );
+                            if (!key?.trim()) return;
+                            createCapability.mutate({
+                              key: key.trim(),
+                              name: name.trim(),
+                            });
+                          }}
+                          title="新增功能"
+                          type="button"
+                        >
+                          <Plus />
+                        </button>
+                        <button
+                          disabled={
+                            !promptCapabilities.data?.find(
+                              (item) => item.key === promptForm.capability,
+                            ) ||
+                            promptCapabilities.data?.find(
+                              (item) => item.key === promptForm.capability,
+                            )?.is_system ||
+                            updateCapability.isPending
+                          }
+                          onClick={() => {
+                            const current = promptCapabilities.data?.find(
+                              (item) => item.key === promptForm.capability,
+                            );
+                            if (!current || current.is_system) return;
+                            const name = window.prompt(
+                              "修改功能名称",
+                              current.name,
+                            );
+                            if (!name?.trim() || name.trim() === current.name)
+                              return;
+                            updateCapability.mutate({
+                              key: current.key,
+                              name: name.trim(),
+                            });
+                          }}
+                          title="修改当前功能"
+                          type="button"
+                        >
+                          <Pencil />
+                        </button>
+                        <button
+                          disabled={
+                            !promptCapabilities.data?.find(
+                              (item) => item.key === promptForm.capability,
+                            ) ||
+                            promptCapabilities.data?.find(
+                              (item) => item.key === promptForm.capability,
+                            )?.is_system ||
+                            deleteCapability.isPending
+                          }
+                          onClick={() => {
+                            const current = promptCapabilities.data?.find(
+                              (item) => item.key === promptForm.capability,
+                            );
+                            if (
+                              current &&
+                              !current.is_system &&
+                              window.confirm(
+                                `删除功能“${current.name}”？有关联预设时不能删除。`,
+                              )
+                            ) {
+                              deleteCapability.mutate(current.key);
+                            }
+                          }}
+                          title="删除当前功能"
+                          type="button"
+                        >
+                          <Trash2 />
+                        </button>
+                      </div>
                     </Field>
-                    <Field label="风格键" halfWide>
+                    <Field
+                      label="风格"
+                      help="这里的名称会直接显示在报告装配台第二级下拉框中。"
+                      halfWide
+                    >
                       <input
-                        pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                        placeholder="例如：严谨导师、数据专家"
                         required
                         value={promptForm.variant_key}
                         onChange={(event) =>
@@ -1817,32 +1837,26 @@ function PresetActions({
 
 function Dashboard({
   llms,
-  prompts,
   embeddings,
   activeLlm,
-  activePrompt,
   activeEmbedding,
   status,
   samples,
   logs,
   logLevel,
   onLlmChange,
-  onPromptChange,
   onEmbeddingChange,
   onLogLevelChange,
 }: {
   llms: LlmPreset[];
-  prompts: PromptPreset[];
   embeddings: EmbeddingPreset[];
   activeLlm?: LlmPreset;
-  activePrompt?: PromptPreset;
   activeEmbedding?: EmbeddingPreset;
   status?: ServerStatus;
   samples: ServerStatus[];
   logs: ApplicationLog[];
   logLevel: string;
   onLlmChange: (id: string) => Promise<void>;
-  onPromptChange: (id: string) => Promise<void>;
   onEmbeddingChange: (id: string) => Promise<void>;
   onLogLevelChange: (value: string) => void;
 }) {
@@ -1866,21 +1880,6 @@ function Dashboard({
             >
               <option value="">环境配置</option>
               {llms.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="提示词预设">
-            <select
-              value={activePrompt?.id ?? ""}
-              onChange={(event) => {
-                if (event.target.value) void onPromptChange(event.target.value);
-              }}
-            >
-              <option value="">模板默认提示词</option>
-              {prompts.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
                 </option>

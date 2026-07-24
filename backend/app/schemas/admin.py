@@ -48,10 +48,9 @@ class PromptPresetInput(BaseModel):
         pattern=r"^[a-z][a-z0-9_]*$",
     )
     variant_key: str = Field(
-        default="default",
+        default="默认风格",
         min_length=1,
         max_length=80,
-        pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
     )
     messages: list[PromptMessageInput] = Field(min_length=1, max_length=100)
 

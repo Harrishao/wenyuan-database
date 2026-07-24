@@ -81,7 +81,7 @@ async def list_prompt_options(
         )
         if not any(item.key == preset.variant_key for item in group.variants):
             group.variants.append(
-                PromptVariantOption(key=preset.variant_key, label=preset.name)
+                PromptVariantOption(key=preset.variant_key, label=preset.variant_key)
             )
     return list(grouped.values())
 

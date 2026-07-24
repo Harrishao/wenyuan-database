@@ -1195,105 +1195,45 @@
   opacity: 1;
 }
 
-.capability-manager {
-  margin-top: 1.2rem;
-  border-top: 1px solid #c7d5d8;
-  padding-top: 1rem;
-}
-
-.capability-manager-title {
+.capability-select-row {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 0.65rem;
-}
-
-.capability-manager-title span {
-  color: #183541;
-  font-size: 0.72rem;
-  font-weight: 650;
-}
-
-.capability-manager-title small {
-  color: #819399;
-  font-size: 0.56rem;
-}
-
-.capability-list {
-  display: grid;
+  align-items: center;
   gap: 0.35rem;
 }
 
-.capability-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #d7e1e3;
-  padding: 0.42rem 0.15rem;
-}
-
-.capability-row > span {
-  display: flex;
+.capability-select-row select {
   min-width: 0;
-  flex-direction: column;
+  flex: 1;
 }
 
-.capability-row strong {
-  color: #354f58;
-  font-size: 0.67rem;
-  font-weight: 600;
-}
-
-.capability-row small {
-  color: #86989e;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.55rem;
-}
-
-.capability-row > svg {
-  width: 0.75rem;
-  color: #809298;
-}
-
-.capability-row button {
+.capability-select-row button {
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
   place-items: center;
-  border: 0;
-  background: transparent;
-  color: #a15346;
+  border: 1px solid #b9cbd0;
+  background: #f5f9fa;
+  color: #335963;
 }
 
-.capability-row button svg {
-  width: 0.78rem;
+.capability-select-row button:hover:not(:disabled) {
+  border-color: #1687a0;
+  background: #e7f3f5;
+  color: #126d80;
 }
 
-.capability-create-form {
-  display: grid;
-  gap: 0.38rem;
-  margin-top: 0.8rem;
+.capability-select-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.36;
 }
 
-.capability-create-form input {
-  height: 32px;
-  border: 1px solid #bdcdd1;
-  background: #fff;
-  padding: 0 0.55rem;
-  color: #183541;
-  font-size: 0.63rem;
+.capability-select-row button:last-child:not(:disabled) {
+  color: #9b493f;
 }
 
-.capability-create-form input:nth-of-type(2) {
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-}
-
-.capability-create-form button {
-  min-height: 32px;
-  border: 1px solid #173b49;
-  background: #173b49;
-  color: #fff;
-  font-size: 0.63rem;
+.capability-select-row button svg {
+  width: 0.85rem;
 }
 
 .prompt-meta-form {

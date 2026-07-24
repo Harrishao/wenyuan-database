@@ -229,7 +229,7 @@ class ChatStreamRequest(BaseModel):
         max_length=40,
         pattern=r"^[a-z][a-z0-9_]*$",
     )
-    variant_key: str = Field(default="rigorous_mentor", min_length=1, max_length=80)
+    variant_key: str = Field(default="严谨导师", min_length=1, max_length=80)
     section_key: str | None = Field(default=None, max_length=80)
 
 

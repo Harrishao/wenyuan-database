@@ -48,10 +48,7 @@ export function ReportAssistantSidebar({
     queryFn: api.listPromptOptions,
   });
   const assistantOptions = useMemo(
-    () =>
-      (promptOptions.data ?? []).filter(
-        (item) => item.key !== "report_generation" && item.variants.length > 0,
-      ),
+    () => (promptOptions.data ?? []).filter((item) => item.variants.length > 0),
     [promptOptions.data],
   );
   const activeOption =
