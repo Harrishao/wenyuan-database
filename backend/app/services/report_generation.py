@@ -19,14 +19,16 @@ from app.domain.models import (
     ReportVersion,
     TemplateSection,
     TemplateVersion,
+    User,
 )
 from app.ports.llm import ChatMessage, ChatOptions
 from app.services.ai_config import (
-    get_active_prompt_preset,
+    get_prompt_profile,
     get_runtime_embedding,
     get_runtime_llm,
     render_prompt_messages,
 )
+from app.services.quotas import ensure_credits, ensure_storage, record_llm_usage
 from app.services.sensitive_scan import scan_sensitive_text
 
 settings = get_settings()
@@ -116,7 +118,7 @@ async def generate_report_sections(
             if version is None or template_version is None or job is None:
                 return
             llm = await get_runtime_llm(session)
-            prompt_preset = await get_active_prompt_preset(session)
+            prompt_preset = await get_prompt_profile(session, "report_generation", "default")
             embedding = await get_runtime_embedding(session)
             inputs = version.generation_context.get("inputs", {})
             template_sections = (
@@ -133,6 +135,9 @@ async def generate_report_sections(
             completed: list[str] = []
 
             for index, template_section in enumerate(template_sections, start=1):
+                owner = await session.get(User, report.owner_id)
+                if owner is not None:
+                    await ensure_credits(session, owner)
                 job.result = {
                     "current_section": template_section.key,
                     "completed_sections": completed,
@@ -200,13 +205,25 @@ async def generate_report_sections(
                         fallback_messages,
                     )
                 )
-                content = await llm.chat(
+                llm_response = await llm.chat(
                     messages,
                     ChatOptions(
                         temperature=0.2,
                         max_tokens=1200,
                         metadata={"report_id": str(report.id), "section": template_section.key},
                     ),
+                )
+                content = llm_response.content
+                if owner is not None:
+                    await ensure_storage(
+                        session, owner, len(content.encode("utf-8"))
+                    )
+                await record_llm_usage(
+                    session,
+                    report.owner_id,
+                    llm_response.usage,
+                    llm_response.model,
+                    "report.generate",
                 )
                 content, used_markers = validate_citation_markers(content, len(evidence))
                 section = await session.scalar(

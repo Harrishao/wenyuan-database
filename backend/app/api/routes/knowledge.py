@@ -27,6 +27,7 @@ from app.schemas.knowledge import (
 )
 from app.services.ai_config import get_runtime_embedding
 from app.services.document_processing import process_document
+from app.services.quotas import ensure_storage
 
 router = APIRouter()
 settings = get_settings()
@@ -232,6 +233,7 @@ async def upload_document(
         raise AppError("DOCUMENT_EMPTY", "上传文件为空", status_code=400)
     if len(content) > settings.max_upload_bytes:
         raise AppError("DOCUMENT_TOO_LARGE", "文件超过允许大小", status_code=413)
+    await ensure_storage(session, current_user, len(content))
     if suffix == ".pdf" and not content.startswith(b"%PDF-"):
         raise AppError("DOCUMENT_CONTENT_INVALID", "PDF 文件头无效", status_code=415)
     digest = hashlib.sha256(content).hexdigest()

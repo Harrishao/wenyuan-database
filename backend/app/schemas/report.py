@@ -150,12 +150,16 @@ class SimilarityJobResponse(BaseModel):
 class PolishPreviewRequest(BaseModel):
     section_key: str = Field(min_length=1, max_length=80)
     text: str = Field(min_length=2, max_length=20_000)
-    style: PolishStyle
+    style: str = Field(
+        min_length=1,
+        max_length=80,
+        pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+    )
 
 
 class PolishPreviewResponse(BaseModel):
     section_key: str
-    style: PolishStyle
+    style: str
     original_text: str
     polished_text: str
     model: str
@@ -187,3 +191,54 @@ class AssistantResponse(BaseModel):
     answer: str
     model: str
     evidence: list[AssistantEvidenceResponse]
+
+
+class ConversationCreate(BaseModel):
+    title: str = Field(default="新对话", min_length=1, max_length=120)
+
+
+class ConversationUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+
+
+class ChatRecordResponse(BaseModel):
+    id: UUID
+    role: Literal["user", "assistant"]
+    content: str
+    capability: str
+    variant_key: str
+    model: str | None
+    usage_estimated: bool
+    created_at: datetime
+
+
+class ConversationResponse(BaseModel):
+    id: UUID
+    report_id: UUID
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    messages: list[ChatRecordResponse] = Field(default_factory=list)
+
+
+class ChatStreamRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=8_000)
+    capability: str = Field(
+        default="general_chat",
+        min_length=2,
+        max_length=40,
+        pattern=r"^[a-z][a-z0-9_]*$",
+    )
+    variant_key: str = Field(default="rigorous_mentor", min_length=1, max_length=80)
+    section_key: str | None = Field(default=None, max_length=80)
+
+
+class PromptVariantOption(BaseModel):
+    key: str
+    label: str
+
+
+class PromptCapabilityOption(BaseModel):
+    key: str
+    name: str
+    variants: list[PromptVariantOption]

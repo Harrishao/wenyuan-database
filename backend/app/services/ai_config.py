@@ -50,6 +50,21 @@ async def get_active_prompt_preset(session: AsyncSession) -> PromptPreset | None
     )
 
 
+async def get_prompt_profile(
+    session: AsyncSession, capability: str, variant_key: str
+) -> PromptPreset | None:
+    return await session.scalar(
+        select(PromptPreset)
+        .where(
+            PromptPreset.capability == capability,
+            PromptPreset.variant_key == variant_key,
+            PromptPreset.is_active.is_(True),
+        )
+        .order_by(PromptPreset.version.desc())
+        .limit(1)
+    )
+
+
 async def get_active_embedding_preset(session: AsyncSession) -> EmbeddingPreset | None:
     return await session.scalar(
         select(EmbeddingPreset).where(EmbeddingPreset.is_active.is_(True)).limit(1)
@@ -150,6 +165,10 @@ async def activate_embedding_preset(session: AsyncSession, preset_id: UUID) -> N
 
 
 async def activate_prompt_preset(session: AsyncSession, preset_id: UUID) -> None:
+    target = await session.get(PromptPreset, preset_id)
+    if target is None:
+        return
     presets = list(await session.scalars(select(PromptPreset)))
     for item in presets:
-        item.is_active = item.id == preset_id
+        if item.capability == target.capability and item.variant_key == target.variant_key:
+            item.is_active = item.id == preset_id

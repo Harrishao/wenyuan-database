@@ -57,6 +57,12 @@ const emptyLlmForm = {
   api_key: "",
   model: "",
   parameters: '{\n  "temperature": 0.7,\n  "max_tokens": 8192\n}',
+  context_window_tokens: 128000,
+  max_output_tokens: 4096,
+  history_turn_limit: 12,
+  input_credits_per_million_tokens: 0,
+  output_credits_per_million_tokens: 0,
+  usage_mode: "auto" as "auto" | "reported" | "estimated",
   bound_prompt_preset_id: "",
   bound_embedding_preset_id: "",
 };
@@ -82,6 +88,8 @@ const emptyPromptMessage = (position: number): PromptMessage => ({
 const emptyPromptForm = {
   name: "",
   description: "",
+  capability: "report_generation" as PromptPreset["capability"],
+  variant_key: "default",
   messages: [emptyPromptMessage(0)],
 };
 
@@ -148,6 +156,7 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
   const [llmForm, setLlmForm] = useState(emptyLlmForm);
   const [embeddingForm, setEmbeddingForm] = useState(emptyEmbeddingForm);
   const [promptForm, setPromptForm] = useState(emptyPromptForm);
+  const [capabilityForm, setCapabilityForm] = useState({ key: "", name: "" });
   const [activeMessageIndex, setActiveMessageIndex] = useState(0);
   const [models, setModels] = useState<string[]>([]);
   const [groupForm, setGroupForm] = useState({
@@ -188,6 +197,10 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
   const prompts = useQuery({
     queryKey: ["admin-prompts"],
     queryFn: api.listPromptPresets,
+  });
+  const promptCapabilities = useQuery({
+    queryKey: ["admin-prompt-capabilities"],
+    queryFn: api.listPromptCapabilities,
   });
   const embeddings = useQuery({
     queryKey: ["admin-embeddings"],
@@ -256,6 +269,7 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
       queryClient.invalidateQueries({ queryKey: ["admin-runtime"] }),
       queryClient.invalidateQueries({ queryKey: ["admin-llms"] }),
       queryClient.invalidateQueries({ queryKey: ["admin-prompts"] }),
+      queryClient.invalidateQueries({ queryKey: ["admin-prompt-capabilities"] }),
       queryClient.invalidateQueries({ queryKey: ["admin-embeddings"] }),
       queryClient.invalidateQueries({ queryKey: ["admin-audits"] }),
     ]);
@@ -269,6 +283,16 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
       api_key: "",
       model: item.model,
       parameters: JSON.stringify(item.parameters, null, 2),
+      context_window_tokens: item.context_window_tokens,
+      max_output_tokens: item.max_output_tokens,
+      history_turn_limit: item.history_turn_limit,
+      input_credits_per_million_tokens: Number(
+        item.input_credits_per_million_tokens,
+      ),
+      output_credits_per_million_tokens: Number(
+        item.output_credits_per_million_tokens,
+      ),
+      usage_mode: item.usage_mode,
       bound_prompt_preset_id: item.bound_prompt_preset_id ?? "",
       bound_embedding_preset_id: item.bound_embedding_preset_id ?? "",
     });
@@ -279,6 +303,8 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
     setPromptForm({
       name: item.name,
       description: item.description ?? "",
+      capability: item.capability,
+      variant_key: item.variant_key,
       messages: item.messages,
     });
     setActiveMessageIndex(0);
@@ -322,7 +348,11 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
     },
     onSuccess: async (item) => {
       selectLlm(item);
-      setNotice(`LLM 预设“${item.name}”已保存`);
+      setNotice(
+        item.usage_mode === "estimated"
+          ? "此渠道不返回usage"
+          : `LLM 预设“${item.name}”已保存`,
+      );
       await refreshPresets();
     },
     onError: (error) => {
@@ -333,21 +363,12 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
 
   const savePrompt = useMutation({
     mutationFn: async () => {
-      const sameName = prompts.data?.find(
-        (item) => item.name === promptForm.name.trim(),
-      );
-      if (
-        sameName &&
-        !window.confirm(`已存在“${sameName.name}”。覆盖这个预设吗？`)
-      ) {
-        throw new Error("SAVE_CANCELLED");
-      }
       const messages = promptForm.messages.map((message, position) => ({
         ...message,
         position,
       }));
-      return sameName
-        ? api.updatePromptPreset(sameName.id, { ...promptForm, messages })
+      return selectedPromptId
+        ? api.updatePromptPreset(selectedPromptId, { ...promptForm, messages })
         : api.createPromptPreset({ ...promptForm, messages });
     },
     onSuccess: async (item) => {
@@ -359,6 +380,41 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
       if (error instanceof Error && error.message === "SAVE_CANCELLED") return;
       setNotice(errorText(error));
     },
+  });
+
+  const createCapability = useMutation({
+    mutationFn: () =>
+      api.createPromptCapability({
+        key: capabilityForm.key.trim(),
+        name: capabilityForm.name.trim(),
+      }),
+    onSuccess: async (item) => {
+      setCapabilityForm({ key: "", name: "" });
+      setPromptForm((current) => ({ ...current, capability: item.key }));
+      setNotice(`功能“${item.name}”已创建`);
+      await queryClient.invalidateQueries({
+        queryKey: ["admin-prompt-capabilities"],
+      });
+    },
+    onError: (error) => setNotice(errorText(error)),
+  });
+
+  const deleteCapability = useMutation({
+    mutationFn: api.deletePromptCapability,
+    onSuccess: async (_, deletedKey) => {
+      setPromptForm((current) => ({
+        ...current,
+        capability:
+          current.capability === deletedKey
+            ? "report_generation"
+            : current.capability,
+      }));
+      setNotice("功能已删除");
+      await queryClient.invalidateQueries({
+        queryKey: ["admin-prompt-capabilities"],
+      });
+    },
+    onError: (error) => setNotice(errorText(error)),
   });
 
   const saveEmbedding = useMutation({
@@ -479,7 +535,28 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
     }: {
       id: string;
       status: "active" | "disabled";
-    }) => api.updateAdminUser(id, status),
+    }) => api.updateAdminUser(id, { status }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+    onError: (error) => setNotice(errorText(error)),
+  });
+  const updateUserQuota = useMutation({
+    mutationFn: ({
+      id,
+      storageMb,
+      monthlyCredits,
+      grant,
+    }: {
+      id: string;
+      storageMb: number;
+      monthlyCredits: number;
+      grant?: number;
+    }) =>
+      api.updateAdminUser(id, {
+        storage_quota_bytes: Math.round(storageMb * 1024 * 1024),
+        monthly_credits: monthlyCredits,
+        ...(grant && grant > 0 ? { credit_grant: grant } : {}),
+      }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
     onError: (error) => setNotice(errorText(error)),
@@ -732,6 +809,92 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
                     </button>
                   </div>
                 </Field>
+                <Field label="上下文窗口 Tokens" halfWide>
+                  <input
+                    min={4096}
+                    type="number"
+                    value={llmForm.context_window_tokens}
+                    onChange={(event) =>
+                      setLlmForm({
+                        ...llmForm,
+                        context_window_tokens: Number(event.target.value),
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="最大输出 Tokens" halfWide>
+                  <input
+                    min={1}
+                    type="number"
+                    value={llmForm.max_output_tokens}
+                    onChange={(event) =>
+                      setLlmForm({
+                        ...llmForm,
+                        max_output_tokens: Number(event.target.value),
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="保留对话轮数">
+                  <input
+                    min={0}
+                    max={100}
+                    type="number"
+                    value={llmForm.history_turn_limit}
+                    onChange={(event) =>
+                      setLlmForm({
+                        ...llmForm,
+                        history_turn_limit: Number(event.target.value),
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="usage 获取方式">
+                  <select
+                    value={llmForm.usage_mode}
+                    onChange={(event) =>
+                      setLlmForm({
+                        ...llmForm,
+                        usage_mode: event.target.value as typeof llmForm.usage_mode,
+                      })
+                    }
+                  >
+                    <option value="auto">自动检测</option>
+                    <option value="reported">渠道返回</option>
+                    <option value="estimated">估算</option>
+                  </select>
+                  {llmForm.usage_mode === "estimated" && (
+                    <p className="mvp5-notice">此渠道不返回usage</p>
+                  )}
+                </Field>
+                <Field label="输入 Credits / 百万 Tokens" halfWide>
+                  <input
+                    min={0}
+                    step="0.000001"
+                    type="number"
+                    value={llmForm.input_credits_per_million_tokens}
+                    onChange={(event) =>
+                      setLlmForm({
+                        ...llmForm,
+                        input_credits_per_million_tokens: Number(event.target.value),
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="输出 Credits / 百万 Tokens" halfWide>
+                  <input
+                    min={0}
+                    step="0.000001"
+                    type="number"
+                    value={llmForm.output_credits_per_million_tokens}
+                    onChange={(event) =>
+                      setLlmForm({
+                        ...llmForm,
+                        output_credits_per_million_tokens: Number(event.target.value),
+                      })
+                    }
+                  />
+                </Field>
                 <Field
                   label="附加请求参数（JSON）"
                   help="可填写 temperature、max_tokens、top_p 等兼容参数。"
@@ -802,182 +965,367 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
 
           {tab === "prompt" && (
             <PresetPage
-              description="编辑发送给模型的完整 messages，并用宏注入报告与证据上下文。"
+              description="勾选决定学生端可见范围；功能与风格均由这里统一发布。"
               icon={<Braces />}
               title="提示词预设"
             >
-              <PresetSelector
-                items={prompts.data ?? []}
-                selectedId={selectedPromptId}
-                onCreate={() => {
-                  setSelectedPromptId("");
-                  setPromptForm(emptyPromptForm);
-                }}
-                onDelete={(item) => confirmDelete("prompt", item.id, item.name)}
-                onSelect={(id) => {
-                  const item = prompts.data?.find((preset) => preset.id === id);
-                  if (item) selectPrompt(item);
-                }}
-              />
-              <div className="prompt-editor">
-                <div className="preset-form prompt-meta-form">
-                  <Field
-                    headerExtra={
-                      <span className="token-estimate-text">
-                        约 {promptTokenEstimate} tokens
-                      </span>
-                    }
-                    label="预设名称"
-                    wide
-                  >
-                    <input
-                      required
-                      value={promptForm.name}
-                      onChange={(event) =>
-                        setPromptForm({
-                          ...promptForm,
-                          name: event.target.value,
-                        })
-                      }
-                    />
-                  </Field>
-                </div>
-                <div className="macro-strip">
-                  <span>插入宏</span>
-                  {[
-                    "{{topic}}",
-                    "{{research_goal}}",
-                    "{{section_title}}",
-                    "{{section_instructions}}",
-                    "{{evidence_json}}",
-                    "{{user_input}}",
-                    "{{inputs.topic}}",
-                  ].map((macro) => (
+              <div className="prompt-library-layout">
+                <aside className="prompt-library-sidebar">
+                  <div className="safety-sidebar-header">
+                    <span>预设目录</span>
                     <button
-                      key={macro}
                       onClick={() => {
-                        const message = promptForm.messages[activeMessageIndex];
-                        if (message)
-                          updateMessage(activeMessageIndex, {
-                            content: `${message.content}${message.content ? "\n" : ""}${macro}`,
-                          });
+                        setSelectedPromptId("");
+                        setPromptForm(emptyPromptForm);
                       }}
+                      title="新建预设"
                       type="button"
                     >
-                      {macro}
+                      <Plus />
                     </button>
-                  ))}
-                </div>
-                <div className="message-list">
-                  {promptForm.messages.map((message, index) => (
-                    <article
-                      className={`prompt-message role-${message.role} ${activeMessageIndex === index ? "active" : ""}`}
-                      key={`${index}-${message.name}`}
-                      onClick={() => setActiveMessageIndex(index)}
-                    >
-                      <div className="prompt-message-toolbar">
-                        <input
-                          value={message.name}
-                          onChange={(event) =>
-                            updateMessage(index, { name: event.target.value })
-                          }
-                        />
-                        <select
-                          value={message.role}
-                          onChange={(event) =>
-                            updateMessage(index, {
-                              role: event.target.value as PromptMessage["role"],
-                            })
-                          }
+                  </div>
+                  <div className="prompt-preset-list">
+                    {prompts.data?.map((item) => {
+                      const capability = promptCapabilities.data?.find(
+                        (entry) => entry.key === item.capability,
+                      );
+                      return (
+                        <div
+                          className={`prompt-preset-card ${
+                            selectedPromptId === item.id ? "active" : ""
+                          }`}
+                          key={item.id}
+                          onClick={() => selectPrompt(item)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              selectPrompt(item);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
                         >
-                          <option value="system">系统</option>
-                          <option value="user">用户</option>
-                          <option value="assistant">AI 助手</option>
-                        </select>
-                        <label>
                           <input
-                            checked={message.enabled}
-                            onChange={(event) =>
-                              updateMessage(index, {
-                                enabled: event.target.checked,
-                              })
+                            checked={item.is_active}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={async (event) => {
+                              try {
+                                await api.setPromptPresetEnabled(
+                                  item.id,
+                                  event.target.checked,
+                                );
+                                await refreshPresets();
+                                await queryClient.invalidateQueries({
+                                  queryKey: ["prompt-options"],
+                                });
+                              } catch (error) {
+                                setNotice(errorText(error));
+                              }
+                            }}
+                            title={
+                              item.is_active
+                                ? "已向学生端开放"
+                                : "未向学生端开放"
                             }
                             type="checkbox"
                           />
-                          启用
-                        </label>
-                        <button
-                          disabled={index === 0}
-                          onClick={() => moveMessage(index, -1)}
-                          type="button"
-                        >
-                          <ArrowUp />
-                        </button>
-                        <button
-                          disabled={index === promptForm.messages.length - 1}
-                          onClick={() => moveMessage(index, 1)}
-                          type="button"
-                        >
-                          <ArrowDown />
-                        </button>
-                        <button
-                          onClick={() =>
-                            setPromptForm((current) => ({
-                              ...current,
-                              messages: current.messages.filter(
-                                (_, itemIndex) => itemIndex !== index,
-                              ),
-                            }))
-                          }
-                          type="button"
-                        >
-                          <Trash2 />
-                        </button>
-                      </div>
-                      <textarea
-                        rows={7}
-                        value={message.content}
+                          <span className="prompt-card-copy">
+                            <strong>{item.name}</strong>
+                            <small>
+                              {capability?.name ?? item.capability}
+                              <i>·</i>
+                              {item.variant_key}
+                            </small>
+                          </span>
+                          <span className="prompt-card-version">
+                            v{item.version}
+                          </span>
+                          <button
+                            className="prompt-card-delete"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              confirmDelete("prompt", item.id, item.name);
+                            }}
+                            title="删除预设"
+                            type="button"
+                          >
+                            <Trash2 />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {!prompts.data?.length && (
+                      <p className="report-empty-copy">暂无提示词预设</p>
+                    )}
+                  </div>
+
+                  <div className="capability-manager">
+                    <div className="capability-manager-title">
+                      <span>功能管理</span>
+                      <small>三项系统功能不可删除</small>
+                    </div>
+                    <div className="capability-list">
+                      {promptCapabilities.data?.map((item) => (
+                        <div className="capability-row" key={item.key}>
+                          <span>
+                            <strong>{item.name}</strong>
+                            <small>{item.key}</small>
+                          </span>
+                          {item.is_system ? (
+                            <KeyRound aria-label="系统功能" />
+                          ) : (
+                            <button
+                              disabled={deleteCapability.isPending}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `删除功能“${item.name}”？有关联预设时不能删除。`,
+                                  )
+                                ) {
+                                  deleteCapability.mutate(item.key);
+                                }
+                              }}
+                              title="删除功能"
+                              type="button"
+                            >
+                              <Trash2 />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <form
+                      className="capability-create-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        createCapability.mutate();
+                      }}
+                    >
+                      <input
+                        maxLength={80}
+                        placeholder="功能名称"
+                        required
+                        value={capabilityForm.name}
                         onChange={(event) =>
-                          updateMessage(index, { content: event.target.value })
+                          setCapabilityForm({
+                            ...capabilityForm,
+                            name: event.target.value,
+                          })
                         }
                       />
-                    </article>
-                  ))}
+                      <input
+                        maxLength={40}
+                        pattern="[a-z][a-z0-9_]*"
+                        placeholder="function_key"
+                        required
+                        value={capabilityForm.key}
+                        onChange={(event) =>
+                          setCapabilityForm({
+                            ...capabilityForm,
+                            key: event.target.value,
+                          })
+                        }
+                      />
+                      <button
+                        disabled={createCapability.isPending}
+                        type="submit"
+                      >
+                        添加功能
+                      </button>
+                    </form>
+                  </div>
+                </aside>
+
+                <div className="prompt-editor">
+                  <div className="preset-form prompt-meta-form">
+                    <Field
+                      headerExtra={
+                        <span className="token-estimate-text">
+                          约 {promptTokenEstimate} tokens
+                        </span>
+                      }
+                      label="预设名称"
+                      wide
+                    >
+                      <input
+                        required
+                        value={promptForm.name}
+                        onChange={(event) =>
+                          setPromptForm({
+                            ...promptForm,
+                            name: event.target.value,
+                          })
+                        }
+                      />
+                    </Field>
+                    <Field label="功能" halfWide>
+                      <select
+                        value={promptForm.capability}
+                        onChange={(event) =>
+                          setPromptForm({
+                            ...promptForm,
+                            capability: event.target.value,
+                          })
+                        }
+                      >
+                        {promptCapabilities.data?.map((item) => (
+                          <option key={item.key} value={item.key}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="风格键" halfWide>
+                      <input
+                        pattern="[a-zA-Z0-9][a-zA-Z0-9_-]*"
+                        required
+                        value={promptForm.variant_key}
+                        onChange={(event) =>
+                          setPromptForm({
+                            ...promptForm,
+                            variant_key: event.target.value,
+                          })
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <div className="macro-strip">
+                    <span>插入宏</span>
+                    {[
+                      "{{topic}}",
+                      "{{research_goal}}",
+                      "{{section_title}}",
+                      "{{section_instructions}}",
+                      "{{evidence_json}}",
+                      "{{user_input}}",
+                      "{{inputs.topic}}",
+                    ].map((macro) => (
+                      <button
+                        key={macro}
+                        onClick={() => {
+                          const message = promptForm.messages[activeMessageIndex];
+                          if (message)
+                            updateMessage(activeMessageIndex, {
+                              content: `${message.content}${message.content ? "\n" : ""}${macro}`,
+                            });
+                        }}
+                        type="button"
+                      >
+                        {macro}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="message-list">
+                    {promptForm.messages.map((message, index) => (
+                      <article
+                        className={`prompt-message role-${message.role} ${activeMessageIndex === index ? "active" : ""}`}
+                        key={`${index}-${message.name}`}
+                        onClick={() => setActiveMessageIndex(index)}
+                      >
+                        <div className="prompt-message-toolbar">
+                          <input
+                            value={message.name}
+                            onChange={(event) =>
+                              updateMessage(index, { name: event.target.value })
+                            }
+                          />
+                          <select
+                            value={message.role}
+                            onChange={(event) =>
+                              updateMessage(index, {
+                                role: event.target.value as PromptMessage["role"],
+                              })
+                            }
+                          >
+                            <option value="system">系统</option>
+                            <option value="user">用户</option>
+                            <option value="assistant">AI 助手</option>
+                          </select>
+                          <label>
+                            <input
+                              checked={message.enabled}
+                              onChange={(event) =>
+                                updateMessage(index, {
+                                  enabled: event.target.checked,
+                                })
+                              }
+                              type="checkbox"
+                            />
+                            启用
+                          </label>
+                          <button
+                            disabled={index === 0}
+                            onClick={() => moveMessage(index, -1)}
+                            type="button"
+                          >
+                            <ArrowUp />
+                          </button>
+                          <button
+                            disabled={index === promptForm.messages.length - 1}
+                            onClick={() => moveMessage(index, 1)}
+                            type="button"
+                          >
+                            <ArrowDown />
+                          </button>
+                          <button
+                            onClick={() =>
+                              setPromptForm((current) => ({
+                                ...current,
+                                messages: current.messages.filter(
+                                  (_, itemIndex) => itemIndex !== index,
+                                ),
+                              }))
+                            }
+                            type="button"
+                          >
+                            <Trash2 />
+                          </button>
+                        </div>
+                        <textarea
+                          rows={7}
+                          value={message.content}
+                          onChange={(event) =>
+                            updateMessage(index, { content: event.target.value })
+                          }
+                        />
+                      </article>
+                    ))}
+                  </div>
+                  <button
+                    className="add-message"
+                    onClick={() =>
+                      setPromptForm((current) => ({
+                        ...current,
+                        messages: [
+                          ...current.messages,
+                          emptyPromptMessage(current.messages.length),
+                        ],
+                      }))
+                    }
+                    type="button"
+                  >
+                    <Plus />
+                    添加消息
+                  </button>
+                  <PresetActions
+                    active={
+                      prompts.data?.find((item) => item.id === selectedPromptId)
+                        ?.is_active ?? false
+                    }
+                    canActivate={false}
+                    onActivate={() => undefined}
+                    onReset={() =>
+                      selectedPromptId
+                        ? selectPrompt(
+                            prompts.data!.find(
+                              (item) => item.id === selectedPromptId,
+                            )!,
+                          )
+                        : setPromptForm(emptyPromptForm)
+                    }
+                    onSave={() => savePrompt.mutate()}
+                  />
                 </div>
-                <button
-                  className="add-message"
-                  onClick={() =>
-                    setPromptForm((current) => ({
-                      ...current,
-                      messages: [
-                        ...current.messages,
-                        emptyPromptMessage(current.messages.length),
-                      ],
-                    }))
-                  }
-                  type="button"
-                >
-                  <Plus />
-                  添加消息
-                </button>
-                <PresetActions
-                  active={activePrompt?.id === selectedPromptId}
-                  canActivate={Boolean(selectedPromptId)}
-                  onActivate={async () => {
-                    await api.activatePromptPreset(selectedPromptId);
-                    await refreshPresets();
-                  }}
-                  onReset={() =>
-                    selectedPromptId
-                      ? selectPrompt(
-                          prompts.data!.find(
-                            (item) => item.id === selectedPromptId,
-                          )!,
-                        )
-                      : setPromptForm(emptyPromptForm)
-                  }
-                  onSave={() => savePrompt.mutate()}
-                />
               </div>
             </PresetPage>
           )}
@@ -1289,6 +1637,9 @@ export function AdminWorkspace({ onBack }: { onBack: () => void }) {
             <UserTable
               users={users.data ?? []}
               onToggle={(id, status) => updateUser.mutate({ id, status })}
+              onQuota={(id, storageMb, monthlyCredits, grant) =>
+                updateUserQuota.mutate({ id, storageMb, monthlyCredits, grant })
+              }
             />
           )}
           {tab === "templates" && <TemplateManagement />}
@@ -1622,9 +1973,16 @@ function Dashboard({
 function UserTable({
   users,
   onToggle,
+  onQuota,
 }: {
   users: Awaited<ReturnType<typeof api.listAdminUsers>>;
   onToggle: (id: string, status: "active" | "disabled") => void;
+  onQuota: (
+    id: string,
+    storageMb: number,
+    monthlyCredits: number,
+    grant?: number,
+  ) => void;
 }) {
   return (
     <section className="data-panel">
@@ -1634,7 +1992,7 @@ function UserTable({
         </span>
         <div>
           <h2>用户与用量</h2>
-          <p>查看用户的文献、报告用量并控制账号状态。</p>
+          <p>查看硬盘与 Credits 用量，调整学生账号配额。</p>
         </div>
       </div>
       <table>
@@ -1644,6 +2002,8 @@ function UserTable({
             <th>角色</th>
             <th>文献</th>
             <th>报告</th>
+            <th>硬盘</th>
+            <th>Credits</th>
             <th>状态</th>
             <th>操作</th>
           </tr>
@@ -1659,6 +2019,16 @@ function UserTable({
               <td>{item.document_count}</td>
               <td>{item.report_count}</td>
               <td>
+                {item.role === "admin"
+                  ? "不限"
+                  : `${formatBytes(item.storage_used_bytes)} / ${formatBytes(item.storage_quota_bytes ?? 0)}`}
+              </td>
+              <td>
+                {item.role === "admin"
+                  ? "不限"
+                  : `${Number(item.credit_balance ?? 0).toFixed(2)} / ${Number(item.monthly_credits ?? 0).toFixed(0)}`}
+              </td>
+              <td>
                 <span
                   className={`status-badge ${
                     item.status === "active" ? "active" : "disabled"
@@ -1668,6 +2038,34 @@ function UserTable({
                 </span>
               </td>
               <td>
+                {item.role === "student" && (
+                  <button
+                    className="user-action-btn"
+                    onClick={() => {
+                      const storage = window.prompt(
+                        "硬盘配额（MiB）",
+                        String((item.storage_quota_bytes ?? 0) / 1024 / 1024),
+                      );
+                      if (storage === null) return;
+                      const monthly = window.prompt(
+                        "每月 Credits",
+                        String(item.monthly_credits ?? 300),
+                      );
+                      if (monthly === null) return;
+                      const grant = window.prompt("本期一次性增发 Credits（可为 0）", "0");
+                      if (grant === null) return;
+                      onQuota(
+                        item.id,
+                        Number(storage),
+                        Number(monthly),
+                        Number(grant),
+                      );
+                    }}
+                    type="button"
+                  >
+                    调整配额
+                  </button>
+                )}
                 <button
                   className={`user-action-btn ${
                     item.status === "active" ? "disable" : "enable"

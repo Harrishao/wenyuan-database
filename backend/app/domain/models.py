@@ -67,6 +67,8 @@ class User(UuidPrimaryKeyMixin, TimestampMixin, Base):
         ),
         default=UserStatus.ACTIVE,
     )
+    storage_quota_bytes: Mapped[int | None] = mapped_column(Integer, default=50 * 1024 * 1024)
+    monthly_credits: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), default=Decimal("300"))
 
 
 class RefreshToken(UuidPrimaryKeyMixin, Base):
@@ -381,15 +383,28 @@ class SensitiveTerm(UuidPrimaryKeyMixin, TimestampMixin, Base):
     created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
 
+class PromptCapability(TimestampMixin, Base):
+    __tablename__ = "prompt_capabilities"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True)
+    is_system: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class PromptPreset(UuidPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "prompt_presets"
 
-    name: Mapped[str] = mapped_column(String(120), unique=True)
+    name: Mapped[str] = mapped_column(String(120))
     description: Mapped[str | None] = mapped_column(Text)
+    capability: Mapped[str] = mapped_column(String(40), default="report_generation", index=True)
+    variant_key: Mapped[str] = mapped_column(String(80), default="default", index=True)
     messages: Mapped[list[dict]] = mapped_column(JSONB, default=list)
     version: Mapped[int] = mapped_column(Integer, default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    __table_args__ = (
+        UniqueConstraint("name", "version", name="uq_prompt_presets_name_version"),
+    )
 
 
 class EmbeddingPreset(UuidPrimaryKeyMixin, TimestampMixin, Base):
@@ -415,6 +430,16 @@ class LlmPreset(UuidPrimaryKeyMixin, TimestampMixin, Base):
     api_key_ciphertext: Mapped[str | None] = mapped_column(Text)
     model: Mapped[str] = mapped_column(String(255))
     parameters: Mapped[dict] = mapped_column(JSONB, default=dict)
+    context_window_tokens: Mapped[int] = mapped_column(Integer, default=128000)
+    max_output_tokens: Mapped[int] = mapped_column(Integer, default=4096)
+    history_turn_limit: Mapped[int] = mapped_column(Integer, default=12)
+    input_credits_per_million_tokens: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    output_credits_per_million_tokens: Mapped[Decimal] = mapped_column(
+        Numeric(18, 6), default=Decimal("0")
+    )
+    usage_mode: Mapped[str] = mapped_column(String(20), default="auto")
     version: Mapped[int] = mapped_column(Integer, default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     bound_prompt_preset_id: Mapped[UUID | None] = mapped_column(
@@ -453,3 +478,49 @@ class Announcement(UuidPrimaryKeyMixin, TimestampMixin, Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+class ChatConversation(UuidPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "chat_conversations"
+
+    owner_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    report_id: Mapped[UUID] = mapped_column(
+        ForeignKey("reports.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(120), default="新对话")
+
+
+class ChatRecord(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "chat_records"
+
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("chat_conversations.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(20))
+    content: Mapped[str] = mapped_column(Text)
+    capability: Mapped[str] = mapped_column(String(40), default="academic_assistant")
+    variant_key: Mapped[str] = mapped_column(String(80), default="rigorous_mentor")
+    model: Mapped[str | None] = mapped_column(String(255))
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    usage_estimated: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
+class CreditLedger(UuidPrimaryKeyMixin, Base):
+    __tablename__ = "credit_ledger"
+
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(30), index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 6))
+    operation: Mapped[str] = mapped_column(String(80), index=True)
+    model: Mapped[str | None] = mapped_column(String(255))
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    estimated: Mapped[bool] = mapped_column(Boolean, default=False)
+    details: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )

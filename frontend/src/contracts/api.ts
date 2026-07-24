@@ -177,7 +177,7 @@ export interface ReportEvent {
   error_message: string | null;
 }
 
-export type PolishStyle = "academic" | "plain" | "concise";
+export type PolishStyle = string;
 export type AssistantRole = "rigorous_mentor" | "data_analyst";
 export type AssistantMode = "dialogue" | "revision";
 
@@ -242,6 +242,10 @@ export interface AdminUser {
   status: "active" | "disabled";
   document_count: number;
   report_count: number;
+  storage_used_bytes: number;
+  storage_quota_bytes: number | null;
+  monthly_credits: string | null;
+  credit_balance: string | null;
   created_at: string;
 }
 
@@ -257,11 +261,27 @@ export interface PromptPreset {
   id: string;
   name: string;
   description: string | null;
+  capability: string;
+  variant_key: string;
   messages: PromptMessage[];
   version: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface PromptCapability {
+  key: string;
+  name: string;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PromptCapabilityOption {
+  key: string;
+  name: string;
+  variants: Array<{ key: string; label: string }>;
 }
 
 export interface LlmPreset {
@@ -270,6 +290,12 @@ export interface LlmPreset {
   base_url: string;
   model: string;
   parameters: Record<string, unknown>;
+  context_window_tokens: number;
+  max_output_tokens: number;
+  history_turn_limit: number;
+  input_credits_per_million_tokens: string;
+  output_credits_per_million_tokens: string;
+  usage_mode: "auto" | "reported" | "estimated";
   has_api_key: boolean;
   version: number;
   is_active: boolean;
@@ -277,6 +303,26 @@ export interface LlmPreset {
   bound_embedding_preset_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ChatRecord {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  capability: string;
+  variant_key: string;
+  model: string | null;
+  usage_estimated: boolean;
+  created_at: string;
+}
+
+export interface Conversation {
+  id: string;
+  report_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: ChatRecord[];
 }
 
 export interface EmbeddingPreset {

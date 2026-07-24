@@ -15,6 +15,8 @@ import type {
   PolishPreview,
   PolishStyle,
   PromptMessage,
+  PromptCapability,
+  PromptCapabilityOption,
   PromptPreset,
   ReportCreateResponse,
   ReportDetail,
@@ -35,6 +37,7 @@ import type {
   AdminTemplateSection,
   ModerationItem,
   Announcement,
+  Conversation,
 } from "@/contracts/api";
 
 export class ApiClientError extends Error {
@@ -127,6 +130,65 @@ function jsonRequest<T>(path: string, method: string, body?: unknown) {
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+}
+
+export async function streamConversation(
+  conversationId: string,
+  payload: {
+    question: string;
+    capability: string;
+    variant_key: string;
+    section_key?: string;
+  },
+  onEvent: (event: string, data: Record<string, unknown>) => void,
+) {
+  const path = `/api/v1/reports/conversations/${conversationId}/stream`;
+  let response = await fetch(path, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      Accept: "text/event-stream",
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (response.status === 401) {
+    await refreshAccessToken();
+    response = await fetch(path, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        Accept: "text/event-stream",
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+  }
+  if (!response.ok) throw new ApiClientError(response.status, await parseError(response));
+  if (!response.body) throw new Error("浏览器未提供流式响应");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) {
+      let event = "message";
+      const dataLines: string[] = [];
+      for (const line of block.split("\n")) {
+        if (line.startsWith("event:")) event = line.slice(6).trim();
+        if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+      }
+      if (dataLines.length) {
+        onEvent(event, JSON.parse(dataLines.join("\n")) as Record<string, unknown>);
+      }
+    }
+    if (done) break;
+  }
 }
 
 export const api = {
@@ -299,9 +361,37 @@ export const api = {
       "POST",
       payload,
     ),
+  listConversations: (reportId: string) =>
+    request<Conversation[]>(`/api/v1/reports/${reportId}/conversations`),
+  createConversation: (reportId: string, title = "新对话") =>
+    jsonRequest<Conversation>(
+      `/api/v1/reports/${reportId}/conversations`,
+      "POST",
+      { title },
+    ),
+  getConversation: (id: string) =>
+    request<Conversation>(`/api/v1/reports/conversations/${id}`),
+  renameConversation: (id: string, title: string) =>
+    jsonRequest<Conversation>(
+      `/api/v1/reports/conversations/${id}`,
+      "PATCH",
+      { title },
+    ),
+  deleteConversation: (id: string) =>
+    request<void>(`/api/v1/reports/conversations/${id}`, {
+      method: "DELETE",
+    }),
   listAdminUsers: () => request<AdminUser[]>("/api/v1/admin/users"),
-  updateAdminUser: (id: string, status: "active" | "disabled") =>
-    jsonRequest<AdminUser>(`/api/v1/admin/users/${id}`, "PATCH", { status }),
+  updateAdminUser: (
+    id: string,
+    payload:
+      | { status: "active" | "disabled" }
+      | {
+          storage_quota_bytes?: number;
+          monthly_credits?: number;
+          credit_grant?: number;
+        },
+  ) => jsonRequest<AdminUser>(`/api/v1/admin/users/${id}`, "PATCH", payload),
   listLlmPresets: () => request<LlmPreset[]>("/api/v1/admin/llm-presets"),
   createLlmPreset: (payload: {
     name: string;
@@ -309,6 +399,12 @@ export const api = {
     api_key?: string;
     model: string;
     parameters: Record<string, unknown>;
+    context_window_tokens: number;
+    max_output_tokens: number;
+    history_turn_limit: number;
+    input_credits_per_million_tokens: number;
+    output_credits_per_million_tokens: number;
+    usage_mode: "auto" | "reported" | "estimated";
     bound_prompt_preset_id?: string | null;
     bound_embedding_preset_id?: string | null;
   }) => jsonRequest<LlmPreset>("/api/v1/admin/llm-presets", "POST", payload),
@@ -320,6 +416,12 @@ export const api = {
       api_key?: string;
       model: string;
       parameters: Record<string, unknown>;
+      context_window_tokens: number;
+      max_output_tokens: number;
+      history_turn_limit: number;
+      input_credits_per_million_tokens: number;
+      output_credits_per_million_tokens: number;
+      usage_mode: "auto" | "reported" | "estimated";
       bound_prompt_preset_id?: string | null;
       bound_embedding_preset_id?: string | null;
     },
@@ -339,9 +441,29 @@ export const api = {
     request<{ models: string[] }>(`/api/v1/admin/llm-presets/${id}/models`),
   listPromptPresets: () =>
     request<PromptPreset[]>("/api/v1/admin/prompt-presets"),
+  listPromptCapabilities: () =>
+    request<PromptCapability[]>("/api/v1/admin/prompt-capabilities"),
+  createPromptCapability: (payload: { key: string; name: string }) =>
+    jsonRequest<PromptCapability>(
+      "/api/v1/admin/prompt-capabilities",
+      "POST",
+      payload,
+    ),
+  updatePromptCapability: (key: string, name: string) =>
+    jsonRequest<PromptCapability>(
+      `/api/v1/admin/prompt-capabilities/${key}`,
+      "PATCH",
+      { name },
+    ),
+  deletePromptCapability: (key: string) =>
+    request<void>(`/api/v1/admin/prompt-capabilities/${key}`, {
+      method: "DELETE",
+    }),
   createPromptPreset: (payload: {
     name: string;
     description?: string;
+    capability: PromptPreset["capability"];
+    variant_key: string;
     messages: PromptMessage[];
   }) =>
     jsonRequest<PromptPreset>("/api/v1/admin/prompt-presets", "POST", payload),
@@ -350,6 +472,8 @@ export const api = {
     payload: {
       name: string;
       description?: string;
+      capability: PromptPreset["capability"];
+      variant_key: string;
       messages: PromptMessage[];
     },
   ) =>
@@ -364,6 +488,14 @@ export const api = {
     request<RuntimeConfig>(`/api/v1/admin/prompt-presets/${id}/activate`, {
       method: "POST",
     }),
+  setPromptPresetEnabled: (id: string, enabled: boolean) =>
+    jsonRequest<PromptPreset>(
+      `/api/v1/admin/prompt-presets/${id}/enabled`,
+      "PATCH",
+      { enabled },
+    ),
+  listPromptOptions: () =>
+    request<PromptCapabilityOption[]>("/api/v1/reports/prompt-options"),
   listEmbeddingPresets: () =>
     request<EmbeddingPreset[]>("/api/v1/admin/embedding-presets"),
   createEmbeddingPreset: (payload: {

@@ -31,6 +31,7 @@ from app.domain.models import (
     SimilarityMatch,
     TemplateSection,
     TemplateVersion,
+    User,
 )
 from app.schemas.report import (
     AssistantEvidenceResponse,
@@ -56,8 +57,9 @@ from app.schemas.report import (
     TemplateSectionResponse,
 )
 from app.services.academic_tools import answer_with_evidence, polish_text
-from app.services.ai_config import get_runtime_llm
+from app.services.ai_config import get_prompt_profile, get_runtime_llm
 from app.services.docx_export import render_report_docx
+from app.services.quotas import ensure_credits, ensure_storage, record_llm_usage
 from app.services.report_generation import (
     generate_report_sections,
     rebuild_version_markdown,
@@ -196,6 +198,13 @@ async def snapshot_version(
     reason: str,
     content_override: tuple[str, str] | None = None,
 ) -> ReportVersion:
+    owner = await session.get(User, report.owner_id)
+    if owner is not None:
+        await ensure_storage(
+            session,
+            owner,
+            len(source.content_markdown.encode("utf-8")),
+        )
     new_version = ReportVersion(
         report_id=report.id,
         version=report.current_version + 1,
@@ -335,6 +344,7 @@ async def create_report(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> ReportCreateResponse:
+    await ensure_credits(session, current_user)
     await ensure_builtin_templates(session)
     knowledge_base = await session.scalar(
         select(KnowledgeBase).where(
@@ -589,6 +599,7 @@ async def restore_report_version(
     session: SessionDep,
     current_user: CurrentUser,
 ) -> ReportDetail:
+    await ensure_credits(session, current_user)
     report = await get_owned_report(session, report_id, current_user.id)
     source = await session.scalar(
         select(ReportVersion).where(
@@ -845,11 +856,23 @@ async def preview_report_polish(
             status_code=409,
         )
     runtime_llm = await get_runtime_llm(session)
-    polished, model = await polish_text(
+    prompt_profile = await get_prompt_profile(session, "local_polish", payload.style)
+    if prompt_profile is None:
+        raise AppError(
+            "PROMPT_PRESET_NOT_AVAILABLE",
+            "该润色风格未开放，请刷新选项后重试",
+            status_code=409,
+        )
+    await ensure_credits(session, current_user)
+    polished, model, usage = await polish_text(
         payload.text,
         payload.style,
         runtime_llm if isinstance(runtime_llm, OpenAICompatibleLlm) else None,
+        prompt_profile,
+        True,
     )
+    await record_llm_usage(session, current_user.id, usage, model, "report.polish")
+    await session.commit()
     return PolishPreviewResponse(
         section_key=payload.section_key,
         style=payload.style,
@@ -934,14 +957,20 @@ async def ask_report_assistant(
         for index, (chunk, document_name, similarity) in enumerate(evidence_rows, start=1)
     ]
     runtime_llm = await get_runtime_llm(session)
-    answer, markers, model = await answer_with_evidence(
+    prompt_profile = await get_prompt_profile(session, "academic_assistant", payload.role)
+    await ensure_credits(session, current_user)
+    answer, markers, model, usage = await answer_with_evidence(
         role=payload.role,
         mode=payload.mode,
         question=payload.question,
         report_context=context,
         evidence=evidence_payload,
         llm=runtime_llm if isinstance(runtime_llm, OpenAICompatibleLlm) else None,
+        prompt_preset=prompt_profile,
+        include_usage=True,
     )
+    await record_llm_usage(session, current_user.id, usage, model, "report.assistant")
+    await session.commit()
     return AssistantResponse(
         role=payload.role,
         mode=payload.mode,

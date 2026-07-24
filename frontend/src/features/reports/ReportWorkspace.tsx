@@ -1,9 +1,9 @@
-import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   BookOpen,
-  Check,
+  ChevronLeft,
   ChevronRight,
   Download,
   FileClock,
@@ -12,22 +12,15 @@ import {
   Library,
   LoaderCircle,
   LogOut,
-  MessageSquareText,
   Plus,
   RefreshCw,
   ScanSearch,
   Search,
   ShieldCheck,
-  WandSparkles,
   X,
 } from "lucide-react";
 
 import type {
-  AssistantAnswer,
-  AssistantMode,
-  AssistantRole,
-  PolishPreview,
-  PolishStyle,
   ProcessingStatus,
   ReportCitation,
   ReportSection,
@@ -36,6 +29,7 @@ import type {
 } from "@/contracts/api";
 import { useAuthStore } from "@/features/auth/auth-store";
 import { api, ApiClientError, streamReportEvents } from "@/lib/api-client";
+import { ReportAssistantSidebar } from "@/features/reports/ReportAssistantSidebar";
 
 const sectionStatus: Record<ProcessingStatus, string> = {
   pending: "等待装订",
@@ -139,13 +133,23 @@ export function ReportWorkspace({
   const [editorMode, setEditorMode] = useState<"edit" | "preview">("preview");
   const [notice, setNotice] = useState<string | null>(null);
   const [selectedText, setSelectedText] = useState("");
-  const [polishStyle, setPolishStyle] = useState<PolishStyle>("academic");
-  const [polishPreview, setPolishPreview] = useState<PolishPreview | null>(null);
   const [similarityResult, setSimilarityResult] = useState<SimilarityResult | null>(null);
-  const [assistantRole, setAssistantRole] = useState<AssistantRole>("rigorous_mentor");
-  const [assistantMode, setAssistantMode] = useState<AssistantMode>("dialogue");
-  const [assistantQuestion, setAssistantQuestion] = useState("");
-  const [assistantAnswer, setAssistantAnswer] = useState<AssistantAnswer | null>(null);
+  const [leftPanel, setLeftPanel] = useState<
+    "reports" | "citations" | "similarity" | "versions"
+  >("reports");
+  const [leftCollapsed, setLeftCollapsed] = useState(() => window.innerWidth < 1024);
+  const [rightCollapsed, setRightCollapsed] = useState(() => window.innerWidth < 1024);
+
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth < 1024) {
+        setLeftCollapsed(true);
+        setRightCollapsed(true);
+      }
+    }
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const templates = useQuery({ queryKey: ["report-templates"], queryFn: api.listReportTemplates });
   const knowledgeBases = useQuery({ queryKey: ["knowledge-bases"], queryFn: api.listKnowledgeBases });
@@ -263,57 +267,6 @@ export function ReportWorkspace({
     },
     onError: (error) => setNotice(errorText(error)),
   });
-  const previewPolish = useMutation({
-    mutationFn: (payload: {
-      reportId: string;
-      sectionKey: string;
-      text: string;
-      style: PolishStyle;
-    }) =>
-      api.previewPolish(payload.reportId, {
-        section_key: payload.sectionKey,
-        text: payload.text,
-        style: payload.style,
-      }),
-    onSuccess: setPolishPreview,
-    onError: (error) => setNotice(errorText(error)),
-  });
-  const acceptPolish = useMutation({
-    mutationFn: (payload: { reportId: string; preview: PolishPreview }) =>
-      api.acceptPolish(payload.reportId, {
-        section_key: payload.preview.section_key,
-        text: payload.preview.original_text,
-        polished_text: payload.preview.polished_text,
-        style: payload.preview.style,
-      }),
-    onSuccess: async (updated) => {
-      queryClient.setQueryData(["report", updated.id], updated);
-      await queryClient.invalidateQueries({ queryKey: ["report-versions", updated.id] });
-      await queryClient.invalidateQueries({ queryKey: ["reports"] });
-      setDrafts({});
-      setSelectedText("");
-      setPolishPreview(null);
-      setNotice(`润色已确认并保存为 v${updated.current_version}`);
-    },
-    onError: (error) => setNotice(errorText(error)),
-  });
-  const askAssistant = useMutation({
-    mutationFn: (payload: {
-      reportId: string;
-      role: AssistantRole;
-      mode: AssistantMode;
-      question: string;
-      sectionKey?: string;
-    }) =>
-      api.askAssistant(payload.reportId, {
-        role: payload.role,
-        mode: payload.mode,
-        question: payload.question,
-        section_key: payload.sectionKey,
-      }),
-    onSuccess: setAssistantAnswer,
-    onError: (error) => setNotice(errorText(error)),
-  });
 
   useEffect(() => {
     if (
@@ -388,8 +341,45 @@ export function ReportWorkspace({
           </button>
         )}
 
-        <div className="report-grid">
-          <aside className="report-index">
+        <div
+          className={`report-grid report-ide-grid ${leftCollapsed ? "left-collapsed" : ""} ${rightCollapsed ? "right-collapsed" : ""}`}
+        >
+          <nav className="report-activity-bar" aria-label="报告工具">
+            {[
+              ["reports", Archive, "报告"],
+              ["citations", BookOpen, "引用"],
+              ["similarity", ScanSearch, "相似度"],
+              ["versions", History, "版本"],
+            ].map(([key, Icon, label]) => (
+              <button
+                className={leftPanel === key ? "active" : ""}
+                key={String(key)}
+                onClick={() => {
+                  setLeftPanel(key as typeof leftPanel);
+                  setLeftCollapsed(false);
+                }}
+                title={String(label)}
+                type="button"
+              >
+                <Icon />
+              </button>
+            ))}
+          </nav>
+          <aside
+            className={`report-index report-primary-sidebar ${
+              leftCollapsed ? "collapsed-hidden" : ""
+            }`}
+          >
+            <button
+              className="sidebar-toggle-handle"
+              onClick={() => setLeftCollapsed((value) => !value)}
+              title={leftCollapsed ? "展开主侧栏" : "收起主侧栏"}
+              type="button"
+            >
+              {leftCollapsed ? <ChevronRight /> : <ChevronLeft />}
+            </button>
+            {leftPanel === "reports" && (
+              <>
             <div className="flex items-center justify-between">
               <div><p className="section-label">报告卷宗</p><p className="mt-1 text-xs text-slate-400">按标题或模板检索</p></div>
               <button className="icon-button" onClick={beginCreating} title="新建报告" type="button">
@@ -422,6 +412,152 @@ export function ReportWorkspace({
               ))}
               {!reports.data?.length && <p className="report-empty-copy">尚未装订报告，先从两篇已归档文献开始。</p>}
             </div>
+              </>
+            )}
+            {leftPanel === "citations" && (
+              <>
+                <p className="section-label">引用证据</p>
+                {activeCitation ? (
+                  <article className="evidence-slip">
+                    <span className="citation-number">{activeCitation.marker}</span>
+                    <h3>{activeCitation.document_name}</h3>
+                    <blockquote>{activeCitation.content}</blockquote>
+                  </article>
+                ) : (
+                  <p className="report-empty-copy">在预览中选择引用编号以核对原文。</p>
+                )}
+              </>
+            )}
+            {leftPanel === "similarity" && (
+              <div className="similarity-container">
+                <p className="section-label">相似度检测</p>
+                <button
+                  className="tool-primary mt-3 w-full"
+                  disabled={!report.data || runSimilarity.isPending}
+                  onClick={() => report.data && runSimilarity.mutate(report.data.id)}
+                  type="button"
+                >
+                  {runSimilarity.isPending ? "正在检测..." : "检测当前报告"}
+                </button>
+                {similarityResult && (
+                  <div className="mt-4 space-y-3">
+                    <div className="similarity-summary">
+                      <strong>{(similarityResult.overall_ratio * 100).toFixed(1)}%</strong>
+                      <span>高相似文本占比</span>
+                    </div>
+                    <div className="similarity-match-list space-y-2 pt-2">
+                      {similarityResult.matches.map((match) => (
+                        <details
+                          className="similarity-match-card rounded border border-[#b8c9ce] bg-white p-2.5 text-xs text-[#183541]"
+                          key={match.id}
+                        >
+                          <summary className="cursor-pointer font-medium text-[#1687a0] hover:underline">
+                            相似度 {(match.score * 100).toFixed(1)}% · {match.document_name}
+                          </summary>
+                          <div className="mt-2 space-y-1.5 pt-1 text-[11px]">
+                            <p className="text-slate-500">
+                              <span className="font-semibold text-slate-700">原文：</span>
+                              {match.source_text}
+                            </p>
+                            <blockquote className="border-l-2 border-amber-500 bg-amber-50/50 p-1.5 text-amber-900">
+                              <span className="font-semibold">报告匹配片段：</span>
+                              {match.matched_text}
+                            </blockquote>
+                          </div>
+                        </details>
+                      ))}
+                      {!similarityResult.matches.length && (
+                        <p className="report-empty-copy mt-2">未发现超过阈值的高相似片段。</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {leftPanel === "versions" && (
+              <div className="history-stack">
+                <p className="section-label mb-2">版本快照</p>
+                {versions.data?.map((item) => {
+                  const isCurrent = item.version === report.data?.current_version;
+                  const isSelected = selectedVersion?.id === item.id;
+                  return (
+                    <div className="history-item-block" key={item.id}>
+                      <button
+                        className={`history-row ${isSelected ? "active" : ""}`}
+                        onClick={() =>
+                          setSelectedVersion(isSelected ? null : item)
+                        }
+                        type="button"
+                      >
+                        <div className="history-row-header">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <FileClock className="h-3.5 w-3.5 flex-shrink-0 text-[#1687a0]" />
+                            <span className="history-title truncate font-medium">
+                              v{item.version} · {versionReason(item.reason)}
+                            </span>
+                          </div>
+                          {isCurrent && (
+                            <span className="history-current-tag">当前</span>
+                          )}
+                        </div>
+                        <div className="history-row-sub">
+                          <span className="history-time">
+                            {localDate(item.created_at)}
+                          </span>
+                        </div>
+                      </button>
+                      {isSelected && report.data && (
+                        <div className="version-inspector-inline">
+                          <div className="flex items-center justify-between gap-2 border-b border-[#c8d8dc] pb-1.5">
+                            <strong className="text-xs text-[#173b49]">
+                              v{selectedVersion.version} · {versionReason(selectedVersion.reason)}
+                            </strong>
+                            <button
+                              className="quiet-action text-xs"
+                              onClick={() => setSelectedVersion(null)}
+                              title="关闭版本预览"
+                              type="button"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <p className="mt-1 text-[10px] text-slate-500">
+                            恢复不会删除之后的历史，而是以这份内容建立新的当前版本。
+                          </p>
+                          <pre className="mt-2 max-h-36 overflow-auto border-l-2 border-[#1687a0] bg-[#f4f8f9] p-2 font-mono text-[10px] text-[#294852]">
+                            {selectedVersion.content_markdown.slice(0, 700) ||
+                              "该版本没有正文内容"}
+                          </pre>
+                          <button
+                            className="version-restore-action mt-2 w-full"
+                            disabled={
+                              selectedVersion.version === report.data.current_version ||
+                              restoreVersion.isPending
+                            }
+                            onClick={() =>
+                              restoreVersion.mutate({
+                                reportId: report.data!.id,
+                                version: selectedVersion.version,
+                              })
+                            }
+                            type="button"
+                          >
+                            {selectedVersion.version === report.data.current_version
+                              ? "这是当前版本"
+                              : restoreVersion.isPending
+                                ? "正在恢复"
+                                : "以此版本建立新版本"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {!versions.data?.length && (
+                  <p className="report-empty-copy">暂无历史版本快照。</p>
+                )}
+              </div>
+            )}
           </aside>
 
           <section className="report-stage">
@@ -508,7 +644,7 @@ export function ReportWorkspace({
                           {saveSection.isPending
                             ? "正在保存新版本"
                             : selectedText
-                              ? `已选择 ${selectedText.length} 字，可在下方润色`
+                              ? `已选择 ${selectedText.length} 字，可在右侧进行局部润色`
                               : "停止输入 0.9 秒后自动保存"}
                         </p>
                       </div>
@@ -517,243 +653,42 @@ export function ReportWorkspace({
                     )}
                   </div>
                 )}
-                {selectedSection && (
-                  <div className="academic-tool-grid">
-                    <section className="academic-tool-card">
-                      <div className="academic-tool-heading">
-                        <ScanSearch className="h-4 w-4" />
-                        <div>
-                          <p className="section-label">私有语料相似度检测</p>
-                          <small>字符 2–4 gram TF-IDF · 余弦相似度</small>
-                        </div>
-                      </div>
-                      <button
-                        className="tool-primary"
-                        disabled={runSimilarity.isPending}
-                        onClick={() => runSimilarity.mutate(report.data!.id)}
-                        type="button"
-                      >
-                        {runSimilarity.isPending ? "正在逐句比对" : "检测当前报告"}
-                      </button>
-                      {similarityResult && (
-                        <div className="similarity-summary">
-                          <strong>
-                            {(similarityResult.overall_ratio * 100).toFixed(1)}%
-                          </strong>
-                          <span>{similarityResult.metric_label}，不是权威平台查重率</span>
-                          <div className="similarity-match-list">
-                            {similarityResult.matches.slice(0, 5).map((match) => (
-                              <details key={match.id}>
-                                <summary>
-                                  相似度 {(match.score * 100).toFixed(1)}% · {match.document_name}
-                                </summary>
-                                <p className="similarity-source">{match.source_text}</p>
-                                <blockquote>{match.matched_text}</blockquote>
-                              </details>
-                            ))}
-                            {!similarityResult.matches.length && (
-                              <p className="report-empty-copy">未发现超过阈值的片段。</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </section>
-
-                    <section className="academic-tool-card">
-                      <div className="academic-tool-heading">
-                        <WandSparkles className="h-4 w-4" />
-                        <div>
-                          <p className="section-label">定向润色</p>
-                          <small>先预览，确认后才建立新版本</small>
-                        </div>
-                      </div>
-                      <select
-                        value={polishStyle}
-                        onChange={(event) => setPolishStyle(event.target.value as PolishStyle)}
-                      >
-                        <option value="academic">学术严谨</option>
-                        <option value="plain">通俗表达</option>
-                        <option value="concise">精简</option>
-                      </select>
-                      <textarea
-                        className="tool-textarea"
-                        onChange={(event) => setSelectedText(event.target.value)}
-                        placeholder="在章节编辑器中选中文字，或在此粘贴待润色片段"
-                        rows={4}
-                        value={selectedText}
-                      />
-                      <button
-                        className="tool-primary"
-                        disabled={selectedText.length < 2 || previewPolish.isPending}
-                        onClick={() =>
-                          previewPolish.mutate({
-                            reportId: report.data!.id,
-                            sectionKey: selectedSection.key,
-                            text: selectedText,
-                            style: polishStyle,
-                          })
-                        }
-                        type="button"
-                      >
-                        {previewPolish.isPending ? "正在生成预览" : "生成前后对比"}
-                      </button>
-                      {polishPreview && (
-                        <div className="polish-comparison">
-                          <div><span>原文</span><p>{polishPreview.original_text}</p></div>
-                          <div><span>建议稿</span><p>{polishPreview.polished_text}</p></div>
-                          <button
-                            className="tool-confirm"
-                            disabled={acceptPolish.isPending}
-                            onClick={() =>
-                              acceptPolish.mutate({
-                                reportId: report.data!.id,
-                                preview: polishPreview,
-                              })
-                            }
-                            type="button"
-                          >
-                            <Check className="h-3.5 w-3.5" />
-                            {acceptPolish.isPending ? "正在建立版本" : "确认并保存新版本"}
-                          </button>
-                        </div>
-                      )}
-                    </section>
-
-                    <section className="academic-tool-card">
-                      <div className="academic-tool-heading">
-                        <MessageSquareText className="h-4 w-4" />
-                        <div>
-                          <p className="section-label">证据型学术助手</p>
-                          <small>回答仅引用当前私有知识库</small>
-                        </div>
-                      </div>
-                      <div className="tool-select-row">
-                        <select
-                          value={assistantRole}
-                          onChange={(event) =>
-                            setAssistantRole(event.target.value as AssistantRole)
-                          }
-                        >
-                          <option value="rigorous_mentor">严谨导师</option>
-                          <option value="data_analyst">数据分析专家</option>
-                        </select>
-                        <select
-                          value={assistantMode}
-                          onChange={(event) =>
-                            setAssistantMode(event.target.value as AssistantMode)
-                          }
-                        >
-                          <option value="dialogue">普通对话</option>
-                          <option value="revision">修改建议</option>
-                        </select>
-                      </div>
-                      <textarea
-                        className="tool-textarea"
-                        onChange={(event) => setAssistantQuestion(event.target.value)}
-                        placeholder="例如：本章节的论证还缺少哪些可验证指标？"
-                        rows={4}
-                        value={assistantQuestion}
-                      />
-                      <button
-                        className="tool-primary"
-                        disabled={assistantQuestion.length < 2 || askAssistant.isPending}
-                        onClick={() =>
-                          askAssistant.mutate({
-                            reportId: report.data!.id,
-                            role: assistantRole,
-                            mode: assistantMode,
-                            question: assistantQuestion,
-                            sectionKey: selectedSection.key,
-                          })
-                        }
-                        type="button"
-                      >
-                        {askAssistant.isPending ? "正在检索证据" : "向当前角色提问"}
-                      </button>
-                      {assistantAnswer && (
-                        <div className="assistant-answer">
-                          <p>{assistantAnswer.answer}</p>
-                          {assistantAnswer.evidence.map((item) => (
-                            <small key={item.document_chunk_id}>
-                              {item.marker} {item.document_name}
-                            </small>
-                          ))}
-                        </div>
-                      )}
-                    </section>
-                  </div>
-                )}
               </>
             ) : (
               <div className="report-blank"><Archive className="h-7 w-7" /><h1>选择一份报告，或建立新的装配任务。</h1></div>
             )}
           </section>
 
-          <aside className="evidence-desk">
-            <div><p className="section-label">引用证据</p><p className="mt-2 text-sm leading-6 text-slate-500">点击预览中的引用编号，在这里核对原始片段。</p></div>
-            {activeCitation ? (
-              <article className="evidence-slip">
-                <div className="flex items-center justify-between"><span className="citation-number">{activeCitation.marker}</span><BookOpen className="h-4 w-4 text-[#1687a0]" /></div>
-                <h3>{activeCitation.document_name}</h3>
-                <p className="font-mono text-[10px] text-slate-400">{activeCitation.heading || "正文"}{activeCitation.page_number ? ` · 第 ${activeCitation.page_number} 页` : ""}</p>
-                <blockquote>{activeCitation.content}</blockquote>
-              </article>
-            ) : (
-              <p className="report-empty-copy">当前章节还没有可核对的引用。</p>
+          <div
+            className={`report-secondary-sidebar ${
+              rightCollapsed ? "collapsed-hidden" : ""
+            }`}
+          >
+            <button
+              className="sidebar-toggle-handle secondary-toggle"
+              onClick={() => setRightCollapsed((value) => !value)}
+              title={rightCollapsed ? "展开 AI 副侧栏" : "收起 AI 副侧栏"}
+              type="button"
+            >
+              {rightCollapsed ? <ChevronLeft /> : <ChevronRight />}
+            </button>
+            {report.data && (
+              <ReportAssistantSidebar
+                reportId={report.data.id}
+                sectionKey={selectedSection?.key}
+                selectedText={selectedText}
+                onNotice={setNotice}
+                onReportChanged={() => {
+                  void queryClient.invalidateQueries({
+                    queryKey: ["report", report.data!.id],
+                  });
+                  void queryClient.invalidateQueries({
+                    queryKey: ["report-versions", report.data!.id],
+                  });
+                }}
+              />
             )}
-            <div className="history-stack">
-              <div className="flex items-center gap-2"><History className="h-4 w-4" /><p className="section-label">版本快照</p></div>
-              {versions.data?.slice(0, 6).map((item, index, items) => (
-                <Fragment key={item.id}>
-                  {(index === 0 ||
-                    new Date(items[index - 1].created_at).toLocaleDateString() !==
-                      new Date(item.created_at).toLocaleDateString()) && (
-                    <p className="mt-3 text-xs font-medium text-slate-400">
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </p>
-                  )}
-                  <button
-                    className={`history-row ${selectedVersion?.id === item.id ? "active" : ""}`}
-                    onClick={() => setSelectedVersion(item)}
-                    type="button"
-                  >
-                    <FileClock className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="history-title">
-                      v{item.version} · {versionReason(item.reason)}
-                    </span>
-                    <small className="history-time">
-                      {localDate(item.created_at)}
-                    </small>
-                    <div className="history-badge">
-                      {item.version === report.data?.current_version ? (
-                        <small>当前</small>
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      )}
-                    </div>
-                  </button>
-                </Fragment>
-              ))}
-              {selectedVersion && report.data && (
-                <div className="version-inspector">
-                  <div className="flex items-center justify-between gap-3">
-                    <strong>v{selectedVersion.version} · {versionReason(selectedVersion.reason)}</strong>
-                    <button className="icon-button" onClick={() => setSelectedVersion(null)} title="关闭版本预览" type="button"><X className="h-3.5 w-3.5" /></button>
-                  </div>
-                  <p>恢复不会删除之后的历史，而是以这份内容建立新的当前版本。</p>
-                  <pre>{selectedVersion.content_markdown.slice(0, 700) || "该版本没有正文内容"}</pre>
-                  <button
-                    className="version-restore-action"
-                    disabled={selectedVersion.version === report.data.current_version || restoreVersion.isPending}
-                    onClick={() => restoreVersion.mutate({ reportId: report.data!.id, version: selectedVersion.version })}
-                    type="button"
-                  >
-                    {selectedVersion.version === report.data.current_version ? "这是当前版本" : restoreVersion.isPending ? "正在恢复" : "以此内容建立新版本"}
-                  </button>
-                </div>
-              )}
-            </div>
-          </aside>
+          </div>
         </div>
       </div>
     </main>

@@ -18,9 +18,11 @@ from app.domain.enums import ProcessingStatus, TemplateStatus
 from app.domain.models import (
     AuditLog,
     BackgroundJob,
+    CreditLedger,
     Document,
     EmbeddingPreset,
     LlmPreset,
+    PromptCapability,
     PromptPreset,
     RefreshToken,
     Report,
@@ -42,6 +44,10 @@ from app.schemas.admin import (
     LlmPresetInput,
     LlmPresetResponse,
     ModelListResponse,
+    PromptCapabilityCreate,
+    PromptCapabilityResponse,
+    PromptCapabilityUpdate,
+    PromptPresetEnabledInput,
     PromptPresetInput,
     PromptPresetResponse,
     RuntimeConfigResponse,
@@ -62,6 +68,7 @@ from app.services.ai_config import (
     get_active_prompt_preset,
 )
 from app.services.document_processing import process_document
+from app.services.quotas import credit_balance, storage_used_bytes
 
 router = APIRouter()
 settings = get_settings()
@@ -99,6 +106,8 @@ def prompt_response(item: PromptPreset) -> PromptPresetResponse:
         id=item.id,
         name=item.name,
         description=item.description,
+        capability=item.capability,
+        variant_key=item.variant_key,
         messages=item.messages,
         version=item.version,
         is_active=item.is_active,
@@ -114,6 +123,12 @@ def llm_response(item: LlmPreset) -> LlmPresetResponse:
         base_url=item.base_url,
         model=item.model,
         parameters=item.parameters,
+        context_window_tokens=item.context_window_tokens,
+        max_output_tokens=item.max_output_tokens,
+        history_turn_limit=item.history_turn_limit,
+        input_credits_per_million_tokens=item.input_credits_per_million_tokens,
+        output_credits_per_million_tokens=item.output_credits_per_million_tokens,
+        usage_mode=item.usage_mode,
         has_api_key=bool(item.api_key_ciphertext),
         version=item.version,
         is_active=item.is_active,
@@ -157,19 +172,25 @@ async def list_users(session: SessionDep, admin: AdminUser) -> list[AdminUserRes
             .order_by(User.created_at.desc())
         )
     ).all()
-    return [
-        AdminUserResponse(
-            id=user.id,
-            email=user.email,
-            display_name=user.display_name,
-            role=user.role,
-            status=user.status,
-            document_count=document_count,
-            report_count=report_count,
-            created_at=user.created_at,
+    responses = []
+    for user, document_count, report_count in rows:
+        responses.append(
+            AdminUserResponse(
+                id=user.id,
+                email=user.email,
+                display_name=user.display_name,
+                role=user.role,
+                status=user.status,
+                document_count=document_count,
+                report_count=report_count,
+                storage_used_bytes=await storage_used_bytes(session, user.id),
+                storage_quota_bytes=user.storage_quota_bytes,
+                monthly_credits=user.monthly_credits,
+                credit_balance=await credit_balance(session, user),
+                created_at=user.created_at,
+            )
         )
-        for user, document_count, report_count in rows
-    ]
+    return responses
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserResponse)
@@ -183,10 +204,25 @@ async def update_user(
     user = await session.get(User, user_id)
     if user is None:
         raise AppError("ADMIN_USER_NOT_FOUND", "用户不存在", status_code=404)
-    if user.id == admin.id and payload.status.value == "disabled":
+    if user.id == admin.id and payload.status and payload.status.value == "disabled":
         raise AppError("ADMIN_SELF_DISABLE", "不能禁用当前管理员", status_code=409)
-    user.status = payload.status
-    if payload.status.value == "disabled":
+    if payload.status is not None:
+        user.status = payload.status
+    if payload.storage_quota_bytes is not None:
+        user.storage_quota_bytes = payload.storage_quota_bytes
+    if payload.monthly_credits is not None:
+        user.monthly_credits = payload.monthly_credits
+    if payload.credit_grant is not None:
+        session.add(
+            CreditLedger(
+                user_id=user.id,
+                kind="grant",
+                amount=payload.credit_grant,
+                operation="admin.grant",
+                details={"admin_id": str(admin.id)},
+            )
+        )
+    if payload.status and payload.status.value == "disabled":
         await session.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
     add_audit(session, admin, request, "user.status.update", "user", user.id, payload.model_dump())
     await session.commit()
@@ -204,6 +240,10 @@ async def update_user(
         status=user.status,
         document_count=document_count or 0,
         report_count=report_count or 0,
+        storage_used_bytes=await storage_used_bytes(session, user.id),
+        storage_quota_bytes=user.storage_quota_bytes,
+        monthly_credits=user.monthly_credits,
+        credit_balance=await credit_balance(session, user),
         created_at=user.created_at,
     )
 
@@ -230,6 +270,12 @@ async def create_llm_preset(
         api_key_ciphertext=encrypt_secret(payload.api_key),
         model=payload.model.strip(),
         parameters=payload.parameters,
+        context_window_tokens=payload.context_window_tokens,
+        max_output_tokens=payload.max_output_tokens,
+        history_turn_limit=payload.history_turn_limit,
+        input_credits_per_million_tokens=payload.input_credits_per_million_tokens,
+        output_credits_per_million_tokens=payload.output_credits_per_million_tokens,
+        usage_mode=payload.usage_mode,
         bound_prompt_preset_id=payload.bound_prompt_preset_id,
         bound_embedding_preset_id=payload.bound_embedding_preset_id,
         created_by=admin.id,
@@ -261,6 +307,12 @@ async def update_llm_preset(
     item.base_url = payload.base_url.strip().rstrip("/")
     item.model = payload.model.strip()
     item.parameters = payload.parameters
+    item.context_window_tokens = payload.context_window_tokens
+    item.max_output_tokens = payload.max_output_tokens
+    item.history_turn_limit = payload.history_turn_limit
+    item.input_credits_per_million_tokens = payload.input_credits_per_million_tokens
+    item.output_credits_per_million_tokens = payload.output_credits_per_million_tokens
+    item.usage_mode = payload.usage_mode
     item.bound_prompt_preset_id = payload.bound_prompt_preset_id
     item.bound_embedding_preset_id = payload.bound_embedding_preset_id
     item.version += 1
@@ -361,6 +413,115 @@ async def list_prompt_presets(session: SessionDep, admin: AdminUser) -> list[Pro
     ]
 
 
+@router.get("/prompt-capabilities", response_model=list[PromptCapabilityResponse])
+async def list_prompt_capabilities(
+    session: SessionDep, admin: AdminUser
+) -> list[PromptCapability]:
+    del admin
+    return list(
+        await session.scalars(
+            select(PromptCapability).order_by(
+                PromptCapability.is_system.desc(), PromptCapability.created_at
+            )
+        )
+    )
+
+
+@router.post(
+    "/prompt-capabilities",
+    response_model=PromptCapabilityResponse,
+    status_code=201,
+)
+async def create_prompt_capability(
+    payload: PromptCapabilityCreate,
+    request: Request,
+    session: SessionDep,
+    admin: AdminUser,
+) -> PromptCapability:
+    item = PromptCapability(
+        key=payload.key.strip(),
+        name=payload.name.strip(),
+        is_system=False,
+    )
+    session.add(item)
+    try:
+        await session.flush()
+        add_audit(
+            session, admin, request, "prompt_capability.create", "prompt_capability", item.key
+        )
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise AppError(
+            "PROMPT_CAPABILITY_EXISTS", "功能键或功能名称已存在", status_code=409
+        ) from exc
+    await session.refresh(item)
+    return item
+
+
+@router.patch(
+    "/prompt-capabilities/{capability_key}",
+    response_model=PromptCapabilityResponse,
+)
+async def update_prompt_capability(
+    capability_key: str,
+    payload: PromptCapabilityUpdate,
+    request: Request,
+    session: SessionDep,
+    admin: AdminUser,
+) -> PromptCapability:
+    item = await session.get(PromptCapability, capability_key)
+    if item is None:
+        raise AppError("PROMPT_CAPABILITY_NOT_FOUND", "功能不存在", status_code=404)
+    item.name = payload.name.strip()
+    try:
+        add_audit(
+            session, admin, request, "prompt_capability.update", "prompt_capability", item.key
+        )
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise AppError(
+            "PROMPT_CAPABILITY_EXISTS", "功能名称已存在", status_code=409
+        ) from exc
+    await session.refresh(item)
+    return item
+
+
+@router.delete("/prompt-capabilities/{capability_key}", status_code=204)
+async def delete_prompt_capability(
+    capability_key: str,
+    request: Request,
+    session: SessionDep,
+    admin: AdminUser,
+) -> None:
+    item = await session.get(PromptCapability, capability_key)
+    if item is None:
+        raise AppError("PROMPT_CAPABILITY_NOT_FOUND", "功能不存在", status_code=404)
+    if item.is_system:
+        raise AppError(
+            "PROMPT_CAPABILITY_IS_SYSTEM",
+            "报告生成、普通对话和局部润色为系统功能，不能删除",
+            status_code=409,
+        )
+    preset_count = await session.scalar(
+        select(func.count()).select_from(PromptPreset).where(
+            PromptPreset.capability == capability_key
+        )
+    )
+    if preset_count:
+        raise AppError(
+            "PROMPT_CAPABILITY_IN_USE",
+            "该功能仍有关联预设，请先删除对应预设",
+            status_code=409,
+        )
+    add_audit(
+        session, admin, request, "prompt_capability.delete", "prompt_capability", item.key
+    )
+    await session.delete(item)
+    await session.commit()
+
+
 @router.post("/prompt-presets", response_model=PromptPresetResponse, status_code=201)
 async def create_prompt_preset(
     payload: PromptPresetInput,
@@ -368,9 +529,13 @@ async def create_prompt_preset(
     session: SessionDep,
     admin: AdminUser,
 ) -> PromptPresetResponse:
+    if await session.get(PromptCapability, payload.capability) is None:
+        raise AppError("PROMPT_CAPABILITY_NOT_FOUND", "所选功能不存在", status_code=400)
     item = PromptPreset(
         name=payload.name.strip(),
         description=payload.description,
+        capability=payload.capability,
+        variant_key=payload.variant_key,
         messages=[message.model_dump() for message in payload.messages],
         created_by=admin.id,
     )
@@ -397,18 +562,36 @@ async def update_prompt_preset(
     item = await session.get(PromptPreset, preset_id)
     if item is None:
         raise AppError("PROMPT_PRESET_NOT_FOUND", "提示词预设不存在", status_code=404)
-    item.name = payload.name.strip()
-    item.description = payload.description
-    item.messages = [message.model_dump() for message in payload.messages]
-    item.version += 1
-    add_audit(session, admin, request, "prompt_preset.update", "prompt_preset", item.id)
+    if await session.get(PromptCapability, payload.capability) is None:
+        raise AppError("PROMPT_CAPABILITY_NOT_FOUND", "所选功能不存在", status_code=400)
+    new_version = PromptPreset(
+        name=payload.name.strip(),
+        description=payload.description,
+        capability=payload.capability,
+        variant_key=payload.variant_key,
+        messages=[message.model_dump() for message in payload.messages],
+        version=item.version + 1,
+        is_active=False,
+        created_by=admin.id,
+    )
+    session.add(new_version)
+    await session.flush()
+    add_audit(
+        session,
+        admin,
+        request,
+        "prompt_preset.version.create",
+        "prompt_preset",
+        new_version.id,
+        {"source_version_id": str(item.id), "version": new_version.version},
+    )
     try:
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
         raise AppError("PRESET_NAME_EXISTS", "预设名称已存在", status_code=409) from exc
-    await session.refresh(item)
-    return prompt_response(item)
+    await session.refresh(new_version)
+    return prompt_response(new_version)
 
 
 @router.delete("/prompt-presets/{preset_id}", status_code=204)
@@ -426,6 +609,38 @@ async def delete_prompt_preset(
     add_audit(session, admin, request, "prompt_preset.delete", "prompt_preset", item.id)
     await session.delete(item)
     await session.commit()
+
+
+@router.patch(
+    "/prompt-presets/{preset_id}/enabled",
+    response_model=PromptPresetResponse,
+)
+async def set_prompt_enabled(
+    preset_id: UUID,
+    payload: PromptPresetEnabledInput,
+    request: Request,
+    session: SessionDep,
+    admin: AdminUser,
+) -> PromptPresetResponse:
+    item = await session.get(PromptPreset, preset_id)
+    if item is None:
+        raise AppError("PROMPT_PRESET_NOT_FOUND", "提示词预设不存在", status_code=404)
+    if payload.enabled:
+        await activate_prompt_preset(session, item.id)
+    else:
+        item.is_active = False
+    add_audit(
+        session,
+        admin,
+        request,
+        "prompt_preset.enabled",
+        "prompt_preset",
+        item.id,
+        {"enabled": payload.enabled},
+    )
+    await session.commit()
+    await session.refresh(item)
+    return prompt_response(item)
 
 
 @router.post("/prompt-presets/{preset_id}/activate", response_model=RuntimeConfigResponse)

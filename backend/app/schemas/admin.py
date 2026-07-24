@@ -1,8 +1,9 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.enums import UserRole, UserStatus
 
@@ -15,11 +16,18 @@ class AdminUserResponse(BaseModel):
     status: UserStatus
     document_count: int
     report_count: int
+    storage_used_bytes: int = 0
+    storage_quota_bytes: int | None = None
+    monthly_credits: Decimal | None = None
+    credit_balance: Decimal | None = None
     created_at: datetime
 
 
 class AdminUserUpdate(BaseModel):
-    status: UserStatus
+    status: UserStatus | None = None
+    storage_quota_bytes: int | None = Field(default=None, ge=1_048_576)
+    monthly_credits: Decimal | None = Field(default=None, ge=0)
+    credit_grant: Decimal | None = Field(default=None, gt=0)
 
 
 class PromptMessageInput(BaseModel):
@@ -33,6 +41,18 @@ class PromptMessageInput(BaseModel):
 class PromptPresetInput(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     description: str | None = Field(default=None, max_length=2_000)
+    capability: str = Field(
+        default="report_generation",
+        min_length=2,
+        max_length=40,
+        pattern=r"^[a-z][a-z0-9_]*$",
+    )
+    variant_key: str = Field(
+        default="default",
+        min_length=1,
+        max_length=80,
+        pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$",
+    )
     messages: list[PromptMessageInput] = Field(min_length=1, max_length=100)
 
 
@@ -44,12 +64,45 @@ class PromptPresetResponse(PromptPresetInput):
     updated_at: datetime
 
 
+class PromptPresetEnabledInput(BaseModel):
+    enabled: bool
+
+
+class PromptCapabilityCreate(BaseModel):
+    key: str = Field(
+        min_length=2,
+        max_length=40,
+        pattern=r"^[a-z][a-z0-9_]*$",
+    )
+    name: str = Field(min_length=2, max_length=80)
+
+
+class PromptCapabilityUpdate(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+
+
+class PromptCapabilityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    key: str
+    name: str
+    is_system: bool
+    created_at: datetime
+    updated_at: datetime
+
+
 class LlmPresetInput(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     base_url: str = Field(min_length=4, max_length=500)
     api_key: str | None = Field(default=None, max_length=2_000)
     model: str = Field(min_length=1, max_length=255)
     parameters: dict = Field(default_factory=dict)
+    context_window_tokens: int = Field(default=128_000, ge=4_096)
+    max_output_tokens: int = Field(default=4_096, ge=1, le=131_072)
+    history_turn_limit: int = Field(default=12, ge=0, le=100)
+    input_credits_per_million_tokens: Decimal = Field(default=0, ge=0)
+    output_credits_per_million_tokens: Decimal = Field(default=0, ge=0)
+    usage_mode: Literal["auto", "reported", "estimated"] = "auto"
     bound_prompt_preset_id: UUID | None = None
     bound_embedding_preset_id: UUID | None = None
 
@@ -60,6 +113,12 @@ class LlmPresetResponse(BaseModel):
     base_url: str
     model: str
     parameters: dict
+    context_window_tokens: int
+    max_output_tokens: int
+    history_turn_limit: int
+    input_credits_per_million_tokens: Decimal
+    output_credits_per_million_tokens: Decimal
+    usage_mode: str
     has_api_key: bool
     version: int
     is_active: bool

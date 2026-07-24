@@ -4,14 +4,16 @@ from typing import Literal
 
 from app.adapters.report_llm import OpenAICompatibleLlm
 from app.core.config import get_settings
-from app.ports.llm import ChatMessage, ChatOptions
+from app.domain.models import PromptPreset
+from app.ports.llm import ChatMessage, ChatOptions, LlmUsage
+from app.services.ai_config import render_prompt_messages
 from app.services.report_generation import validate_citation_markers
 
 PolishStyle = Literal["academic", "plain", "concise"]
 AssistantRole = Literal["rigorous_mentor", "data_analyst"]
 AssistantMode = Literal["dialogue", "revision"]
 
-STYLE_LABELS: dict[PolishStyle, str] = {
+STYLE_LABELS: dict[str, str] = {
     "academic": "学术严谨",
     "plain": "通俗表达",
     "concise": "精简",
@@ -35,7 +37,7 @@ def _external_llm() -> OpenAICompatibleLlm | None:
     return None
 
 
-def _offline_polish(text: str, style: PolishStyle) -> str:
+def _offline_polish(text: str, style: str) -> str:
     cleaned = re.sub(r"[ \t]+", " ", text).strip()
     if style == "academic":
         replacements = {
@@ -58,6 +60,8 @@ def _offline_polish(text: str, style: PolishStyle) -> str:
         for source, target in replacements.items():
             cleaned = cleaned.replace(source, target)
         return cleaned
+    if style != "concise":
+        return cleaned
     sentences = [item.strip() for item in re.split(r"(?<=[。！？!?])", cleaned) if item.strip()]
     deduplicated = list(dict.fromkeys(sentences))
     return "".join(deduplicated).replace("在一定程度上", "").replace("需要指出的是，", "")
@@ -65,25 +69,34 @@ def _offline_polish(text: str, style: PolishStyle) -> str:
 
 async def polish_text(
     text: str,
-    style: PolishStyle,
+    style: str,
     llm: OpenAICompatibleLlm | None = None,
-) -> tuple[str, str]:
+    prompt_preset: PromptPreset | None = None,
+    include_usage: bool = False,
+) -> tuple[str, str] | tuple[str, str, LlmUsage]:
     llm = llm or _external_llm()
     if llm is None:
-        return _offline_polish(text, style), "local-rule-polisher-v1"
+        base = (_offline_polish(text, style), "local-rule-polisher-v1")
+        return (*base, LlmUsage(0, 0, 0)) if include_usage else base
     prompt = (
-        f"按“{STYLE_LABELS[style]}”风格润色下列文字。保持事实、数字和 [数字] 引用不变，"
+        f"按“{STYLE_LABELS.get(style, style)}”风格润色下列文字。保持事实、数字和 [数字] 引用不变，"
         "只输出润色后的正文：\n\n"
         f"{text}"
     )
+    fallback = [
+        ChatMessage(role="system", content="你是学术文本编辑。不得补充原文没有的事实。"),
+        ChatMessage(role="user", content=prompt),
+    ]
     result = await llm.chat(
-        [
-            ChatMessage(role="system", content="你是学术文本编辑。不得补充原文没有的事实。"),
-            ChatMessage(role="user", content=prompt),
-        ],
+        render_prompt_messages(
+            prompt_preset,
+            {"text": text, "style": style, "style_label": STYLE_LABELS.get(style, style)},
+            fallback,
+        ),
         ChatOptions(temperature=0.35, max_tokens=1200),
     )
-    return result.strip(), llm.model_name
+    base = (result.content.strip(), llm.model_name)
+    return (*base, result.usage) if include_usage else base
 
 
 async def answer_with_evidence(
@@ -94,10 +107,17 @@ async def answer_with_evidence(
     report_context: str,
     evidence: list[dict],
     llm: OpenAICompatibleLlm | None = None,
-) -> tuple[str, list[int], str]:
+    prompt_preset: PromptPreset | None = None,
+    include_usage: bool = False,
+) -> tuple[str, list[int], str] | tuple[str, list[int], str, LlmUsage]:
     llm = llm or _external_llm()
     if not evidence:
-        return "当前知识库没有足够证据回答该问题，请补充相关文献。", [], "no-evidence"
+        base = (
+            "当前知识库没有足够证据回答该问题，请补充相关文献。",
+            [],
+            "no-evidence",
+        )
+        return (*base, LlmUsage(0, 0, 0)) if include_usage else base
     payload = json.dumps(
         {
             "mode": mode,
@@ -115,13 +135,30 @@ async def answer_with_evidence(
             text = re.sub(r"\s+", " ", item["content"]).strip()[:220].rstrip("，。；; ")
             excerpts.append(f"{text}。[{index}]")
         answer = f"{prefix}{ROLE_PROMPTS[role]}\n\n" + "\n\n".join(excerpts)
-        return answer, list(range(1, len(excerpts) + 1)), "local-evidence-assistant-v1"
-    answer = await llm.chat(
-        [
-            ChatMessage(role="system", content=ROLE_PROMPTS[role]),
-            ChatMessage(role="user", content=payload),
-        ],
+        base = (
+            answer,
+            list(range(1, len(excerpts) + 1)),
+            "local-evidence-assistant-v1",
+        )
+        return (*base, LlmUsage(0, 0, 0)) if include_usage else base
+    fallback = [
+        ChatMessage(role="system", content=ROLE_PROMPTS[role]),
+        ChatMessage(role="user", content=payload),
+    ]
+    result = await llm.chat(
+        render_prompt_messages(
+            prompt_preset,
+            {
+                "role": role,
+                "mode": mode,
+                "question": question,
+                "report": report_context,
+                "evidence": evidence,
+            },
+            fallback,
+        ),
         ChatOptions(temperature=0.2, max_tokens=1200),
     )
-    cleaned, markers = validate_citation_markers(answer, len(evidence))
-    return cleaned, markers, llm.model_name
+    cleaned, markers = validate_citation_markers(result.content, len(evidence))
+    base = (cleaned, markers, llm.model_name)
+    return (*base, result.usage) if include_usage else base
