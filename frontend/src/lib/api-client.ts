@@ -291,6 +291,8 @@ export const api = {
     inputs: Record<string, string>;
   }) => jsonRequest<ReportCreateResponse>("/api/v1/reports", "POST", payload),
   getReport: (id: string) => request<ReportDetail>(`/api/v1/reports/${id}`),
+  deleteReport: (id: string) =>
+    request<void>(`/api/v1/reports/${id}`, { method: "DELETE" }),
   updateReportSection: (
     reportId: string,
     sectionKey: string,

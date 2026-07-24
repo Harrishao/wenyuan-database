@@ -17,6 +17,7 @@ import {
   ScanSearch,
   Search,
   ShieldCheck,
+  Trash2,
   X,
 } from "lucide-react";
 
@@ -226,6 +227,24 @@ export function ReportWorkspace({
     },
     onError: (error) => setNotice(errorText(error)),
   });
+  const deleteReport = useMutation({
+    mutationFn: (id: string) => api.deleteReport(id),
+    onSuccess: async (_, deletedId) => {
+      setNotice("报告已删除");
+      await queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.removeQueries({ queryKey: ["report", deletedId] });
+      queryClient.removeQueries({ queryKey: ["report-versions", deletedId] });
+      if (selectedReportId === deletedId) {
+        const remaining = reports.data?.filter((item) => item.id !== deletedId);
+        if (remaining?.[0]) {
+          setSelectedId(remaining[0].id);
+        } else {
+          setCreating(true);
+        }
+      }
+    },
+    onError: (error) => setNotice(errorText(error)),
+  });
   const saveSection = useMutation({
     mutationFn: (payload: { reportId: string; sectionKey: string; content: string }) =>
       api.updateReportSection(payload.reportId, payload.sectionKey, payload.content),
@@ -393,7 +412,7 @@ export function ReportWorkspace({
             <div className="mt-5 space-y-1">
               {reports.data?.map((item) => (
                 <button
-                  className={`report-index-item ${selectedReportId === item.id && !creating ? "active" : ""}`}
+                  className={`report-index-item group relative ${selectedReportId === item.id && !creating ? "active" : ""}`}
                   key={item.id}
                   onClick={() => {
                     setCreating(false);
@@ -403,10 +422,32 @@ export function ReportWorkspace({
                   }}
                   type="button"
                 >
-                  <span className="line-clamp-2 text-left font-medium">{item.title}</span>
+                  <span className="line-clamp-2 text-left font-medium pr-6">{item.title}</span>
                   <span className="mt-2 flex items-center justify-between font-mono text-[10px] text-slate-400">
                     <span>{item.template_name}</span><span>{item.status === "ready" ? "已完成" : "草稿/处理中"}</span><span>v{item.current_version}</span>
                     <span>{localDate(item.updated_at)}</span>
+                  </span>
+                  <span
+                    className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded text-slate-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (window.confirm(`确定要删除报告“${item.title}”吗？此操作不可撤销！`)) {
+                        deleteReport.mutate(item.id);
+                      }
+                    }}
+                    title="删除报告"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.stopPropagation();
+                        if (window.confirm(`确定要删除报告“${item.title}”吗？此操作不可撤销！`)) {
+                          deleteReport.mutate(item.id);
+                        }
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </span>
                 </button>
               ))}
@@ -583,7 +624,21 @@ export function ReportWorkspace({
                   <div className="min-w-0 flex-1">
                     <div className="report-kicker-row">
                       <p className="section-label">{report.data.template_name} · {report.data.knowledge_base_name}</p>
-                      <button className="compact-export" onClick={() => void exportCurrentReport()} type="button"><Download className="h-3.5 w-3.5" />校验并导出 DOCX</button>
+                      <div className="flex items-center gap-2">
+                        <button className="compact-export" onClick={() => void exportCurrentReport()} type="button"><Download className="h-3.5 w-3.5" />校验并导出 DOCX</button>
+                        <button
+                          className="compact-export border-red-200 text-red-700 hover:border-red-400 hover:bg-red-50"
+                          onClick={() => {
+                            if (report.data && window.confirm(`确定要删除报告“${report.data.title}”吗？此操作不可撤销！`)) {
+                              deleteReport.mutate(report.data.id);
+                            }
+                          }}
+                          title="删除此报告"
+                          type="button"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-600" />删除报告
+                        </button>
+                      </div>
                     </div>
                     <h1>{report.data.title}</h1>
                     <p className="mt-2 text-sm text-slate-500">版本 v{report.data.current_version} · 生成进度 {report.data.progress}%</p>
